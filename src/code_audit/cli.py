@@ -277,7 +277,7 @@ _EXAMPLE_REVIEW_MD = """\
 @app.command()
 def serve(
     port: int = typer.Option(8900, "--port", help="Port for the webhook server"),
-    host: str = typer.Option("0.0.0.0", "--host", help="Host to bind to"),
+    host: str = typer.Option("127.0.0.1", "--host", help="Host to bind to (use 0.0.0.0 for external access)"),
 ) -> None:
     """Start the GitHub webhook server for automatic PR reviews.
 

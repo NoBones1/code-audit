@@ -33,10 +33,22 @@ BINARY_EXTENSIONS = {
 }
 
 
+_SAFE_REF_RE = re.compile(r"^[a-zA-Z0-9._\-/~^]+$")
+
+
+def _validate_diff_target(diff_target: str) -> None:
+    """Validate diff_target to prevent git argument injection."""
+    if diff_target.startswith("-"):
+        raise ValueError(f"Invalid diff target (cannot start with '-'): {diff_target}")
+    if not _SAFE_REF_RE.match(diff_target):
+        raise ValueError(f"Invalid diff target (contains disallowed characters): {diff_target}")
+
+
 def run_git_diff(project_path: Path, diff_target: str = "HEAD") -> str:
     """Run git diff and return the raw output."""
+    _validate_diff_target(diff_target)
     try:
-        # First try: diff against target (staged + unstaged changes)
+        # git diff <ref> shows all changes (staged + unstaged) relative to <ref>
         result = subprocess.run(
             ["git", "diff", diff_target],
             cwd=project_path,
@@ -46,20 +58,8 @@ def run_git_diff(project_path: Path, diff_target: str = "HEAD") -> str:
         )
         diff_output = result.stdout
 
-        # Also get staged changes if diffing against HEAD
-        if diff_target == "HEAD":
-            staged = subprocess.run(
-                ["git", "diff", "--cached"],
-                cwd=project_path,
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
-            if staged.stdout:
-                diff_output = diff_output + "\n" + staged.stdout if diff_output else staged.stdout
-
-        # If no diff output, try showing unstaged changes
-        if not diff_output.strip():
+        # If diffing against a non-HEAD ref and no output, also check unstaged
+        if not diff_output.strip() and diff_target != "HEAD":
             unstaged = subprocess.run(
                 ["git", "diff"],
                 cwd=project_path,
@@ -97,40 +97,38 @@ def parse_hunks(hunk_text: str) -> list[HunkDiff]:
     """Parse hunk sections from diff text."""
     hunks: list[HunkDiff] = []
     current_header: str | None = None
+    current_match: re.Match | None = None
     current_lines: list[str] = []
-    additions = 0
-    deletions = 0
 
     for line in hunk_text.split("\n"):
         match = HUNK_HEADER_RE.match(line)
         if match:
-            # Save previous hunk
-            if current_header:
+            # Save previous hunk using its OWN parsed header
+            if current_header and current_match:
                 hunks.append(HunkDiff(
                     header=current_header,
-                    old_start=int(match.group(1)),
-                    old_count=int(match.group(2) or "1"),
-                    new_start=int(match.group(3)),
-                    new_count=int(match.group(4) or "1"),
+                    old_start=int(current_match.group(1)),
+                    old_count=int(current_match.group(2) or "1"),
+                    new_start=int(current_match.group(3)),
+                    new_count=int(current_match.group(4) or "1"),
                     content="\n".join(current_lines),
                 ))
             current_header = line
+            current_match = match
             current_lines = []
         elif current_header is not None:
             current_lines.append(line)
 
     # Save last hunk
-    if current_header:
-        hdr_match = HUNK_HEADER_RE.match(current_header)
-        if hdr_match:
-            hunks.append(HunkDiff(
-                header=current_header,
-                old_start=int(hdr_match.group(1)),
-                old_count=int(hdr_match.group(2) or "1"),
-                new_start=int(hdr_match.group(3)),
-                new_count=int(hdr_match.group(4) or "1"),
-                content="\n".join(current_lines),
-            ))
+    if current_header and current_match:
+        hunks.append(HunkDiff(
+            header=current_header,
+            old_start=int(current_match.group(1)),
+            old_count=int(current_match.group(2) or "1"),
+            new_start=int(current_match.group(3)),
+            new_count=int(current_match.group(4) or "1"),
+            content="\n".join(current_lines),
+        ))
 
     return hunks
 

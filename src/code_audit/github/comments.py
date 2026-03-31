@@ -6,6 +6,8 @@ mapping each finding to the exact diff line where the issue was found.
 
 from __future__ import annotations
 
+import re
+
 from code_audit.github.client import GitHubClient
 from code_audit.models.finding import Finding, Severity
 from code_audit.models.report import AuditReport
@@ -135,7 +137,6 @@ def build_review_comments(
         for line in patch.split("\n"):
             if line.startswith("@@"):
                 # Parse hunk header: @@ -old_start,old_count +new_start,new_count @@
-                import re
                 match = re.search(r"\+(\d+)", line)
                 if match:
                     current_line = int(match.group(1)) - 1

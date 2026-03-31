@@ -73,9 +73,17 @@ class AgentFinding(BaseModel):
         default_factory=list,
         description="Relevant tags, e.g. owasp-a01, n+1-query, solid-violation",
     )
+    dimension: str = Field(
+        default="combined",
+        description="Which audit dimension produced this finding (security, architectural, etc.)",
+    )
 
-    def to_finding(self, dimension: str) -> Finding:
-        """Convert agent finding to full Finding model."""
+    def to_finding(self, dimension: str | None = None) -> Finding:
+        """Convert agent finding to full Finding model.
+
+        Args:
+            dimension: Override dimension. If None, uses self.dimension.
+        """
         from code_audit.models.finding import FindingLocation, Severity
 
         severity_map = {
@@ -84,9 +92,11 @@ class AgentFinding(BaseModel):
             "pre_existing": Severity.PRE_EXISTING,
         }
 
+        effective_dimension = dimension or self.dimension
+
         return Finding(
-            dimension=dimension,
-            severity=severity_map.get(self.severity, Severity.NIT),
+            dimension=effective_dimension,
+            severity=severity_map.get(self.severity.lower(), Severity.NIT),
             title=self.title,
             description=self.description,
             location=FindingLocation(

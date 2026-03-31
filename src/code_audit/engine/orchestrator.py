@@ -157,10 +157,12 @@ class Orchestrator:
             self.decision_tracker.record_audit_completion(report)
 
             # Apply memory-based suppression (filter previously dismissed findings)
+            # Load dismissals once to avoid N reads for N findings
+            dismissals = self.decision_tracker.memory.get_dismissals()
             suppressed = []
             retained = []
             for f in report.findings:
-                if self.decision_tracker.should_suppress(f):
+                if self.decision_tracker.should_suppress(f, dismissals=dismissals):
                     suppressed.append(f)
                 else:
                     retained.append(f)

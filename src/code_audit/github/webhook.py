@@ -14,9 +14,12 @@ import hmac
 import json
 import logging
 import os
+import re
 import subprocess
 import tempfile
 from pathlib import Path
+
+import httpx
 
 from code_audit.config.loader import load_config
 from code_audit.config.models import ReviewMode
@@ -62,6 +65,7 @@ async def handle_pr_event(
     )
 
     client = GitHubClient(token=github_token)
+    check_run_id = None  # Initialize before try block to avoid UnboundLocalError
 
     try:
         # Create check run to show we're working
@@ -193,20 +197,21 @@ async def handle_pr_event(
 
     except Exception as e:
         logger.error(f"Review failed for PR #{pr_number}: {e}")
-        # Try to update check run with failure
-        try:
-            await client.update_check_run(
-                owner=owner,
-                repo=repo_name,
-                check_run_id=check_run_id,
-                conclusion="neutral",
-                output={
-                    "title": "Code review encountered an error",
-                    "summary": f"Error: {str(e)[:500]}",
-                },
-            )
-        except Exception:
-            pass
+        # Try to update check run with failure (only if we got a check_run_id)
+        if check_run_id is not None:
+            try:
+                await client.update_check_run(
+                    owner=owner,
+                    repo=repo_name,
+                    check_run_id=check_run_id,
+                    conclusion="neutral",
+                    output={
+                        "title": "Code review encountered an error",
+                        "summary": "Review encountered an internal error. Check server logs for details.",
+                    },
+                )
+            except Exception:
+                pass
         raise
     finally:
         await client.close()

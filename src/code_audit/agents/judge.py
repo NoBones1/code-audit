@@ -104,8 +104,8 @@ class JudgeAgent:
         )
 
         # Convert agent findings to full Finding objects
-        judged_findings = [f.to_finding(f.dimension if hasattr(f, 'dimension') else "combined")
-                          for f in response.findings]
+        # AgentFinding now has a dimension field, so to_finding() uses it automatically
+        judged_findings = [f.to_finding() for f in response.findings]
 
         # Try to preserve original finding IDs where possible by matching on title+file
         original_by_key: dict[str, Finding] = {}

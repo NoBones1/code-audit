@@ -93,27 +93,32 @@ class DecisionTracker:
             dimensions_run=report.summary.dimensions_run,
         ))
 
-    def should_suppress(self, finding: Finding) -> bool:
+    def should_suppress(
+        self,
+        finding: Finding,
+        dismissals: list | None = None,
+    ) -> bool:
         """Check if a finding should be suppressed based on prior dismissals.
 
         A finding is suppressed if:
         1. A finding with the same title was previously dismissed
         2. AND it was for the same file pattern or a broader pattern
         3. AND it was dismissed recently (within last 50 decisions)
+
+        Args:
+            finding: The finding to check.
+            dismissals: Pre-loaded dismissals list. If None, loads from disk.
         """
-        dismissals = self.memory.get_dismissals()
+        if dismissals is None:
+            dismissals = self.memory.get_dismissals()
         if not dismissals:
             return False
 
         # Check recent dismissals (last 50)
         recent = dismissals[-50:]
         for d in recent:
-            # Match on title (exact or substring)
-            title_match = (
-                d.finding_title.lower() == finding.title.lower()
-                or d.finding_title.lower() in finding.title.lower()
-                or finding.title.lower() in d.finding_title.lower()
-            )
+            # Match on title — exact match only to prevent over-broad suppression
+            title_match = d.finding_title.lower() == finding.title.lower()
             if not title_match:
                 continue
 
