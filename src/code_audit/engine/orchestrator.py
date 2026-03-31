@@ -30,6 +30,8 @@ from code_audit.context.file_reader import read_changed_files
 from code_audit.context.review_md import find_claude_md, parse_review_md
 from code_audit.engine.state import AuditState
 from code_audit.llm.registry import create_provider
+from code_audit.memory.decisions import DecisionTracker
+from code_audit.memory.store import ProjectMemory
 from code_audit.models.context import ReviewContext
 from code_audit.models.finding import Finding
 from code_audit.models.report import AuditReport, AuditSummary, DimensionSummary
@@ -59,6 +61,8 @@ class Orchestrator:
         self.config = config
         self.project_path = project_path.resolve()
         self.state = AuditState(self.project_path, config.output.directory)
+        self.memory = ProjectMemory(self.project_path)
+        self.decision_tracker = DecisionTracker(self.project_path)
 
         # Callbacks for terminal UI
         self.on_agent_start = on_agent_start or (lambda name: None)
@@ -147,6 +151,28 @@ class Orchestrator:
 
             self.state.save_report(report)
             self.state.mark_completed(len(final_findings), total_duration)
+
+            # Record audit in project memory for trend tracking
+            self.decision_tracker.record_audit_completion(report)
+
+            # Apply memory-based suppression (filter previously dismissed findings)
+            suppressed = []
+            retained = []
+            for f in report.findings:
+                if self.decision_tracker.should_suppress(f):
+                    suppressed.append(f)
+                else:
+                    retained.append(f)
+            if suppressed:
+                report.findings = retained
+                # Recalculate summary
+                report.summary = AuditSummary.from_findings(
+                    retained,
+                    files_reviewed=report.summary.files_reviewed,
+                    dimensions=report.summary.dimensions_run,
+                    dimension_details=report.summary.dimension_summaries,
+                )
+
             return report
 
         except Exception as e:
@@ -273,7 +299,8 @@ class Orchestrator:
 
         llm_config = self.config.llm_for_agent(agent_name)
         provider = create_provider(llm_config)
-        agent = CombinedAgent(llm=provider)
+        memory_ctx = self.memory.format_for_prompt() or None
+        agent = CombinedAgent(llm=provider, memory_context=memory_ctx)
 
         findings, summary, duration = await agent.review(context)
 
@@ -323,7 +350,8 @@ class Orchestrator:
             if agent_cfg:
                 extra = agent_cfg.extra_instructions
 
-            agent = agent_cls(llm=provider, extra_instructions=extra)
+            memory_ctx = self.memory.format_for_prompt() or None
+            agent = agent_cls(llm=provider, extra_instructions=extra, memory_context=memory_ctx)
             tasks.append(self._run_single_agent(name, agent, context))
             agent_names.append(name)
 

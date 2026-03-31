@@ -1,0 +1,123 @@
+{
+  "name": "code-audit",
+  "displayName": "CodeAudit — AI Code Review",
+  "description": "Multi-agent AI code review with 5 specialist agents (security, architecture, performance, correctness, maintainability)",
+  "version": "0.1.0",
+  "publisher": "code-audit",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Linters",
+    "Testing",
+    "Other"
+  ],
+  "keywords": [
+    "code review",
+    "AI",
+    "security",
+    "SARIF",
+    "multi-agent"
+  ],
+  "activationEvents": [
+    "workspaceContains:.git",
+    "onCommand:codeAudit.reviewQuick",
+    "onCommand:codeAudit.reviewDeep",
+    "onCommand:codeAudit.reviewSecurity"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "codeAudit.reviewQuick",
+        "title": "CodeAudit: Quick Review",
+        "icon": "$(zap)"
+      },
+      {
+        "command": "codeAudit.reviewDeep",
+        "title": "CodeAudit: Deep Review",
+        "icon": "$(search)"
+      },
+      {
+        "command": "codeAudit.reviewSecurity",
+        "title": "CodeAudit: Security Review",
+        "icon": "$(shield)"
+      },
+      {
+        "command": "codeAudit.dismissFinding",
+        "title": "CodeAudit: Dismiss Finding"
+      },
+      {
+        "command": "codeAudit.openReport",
+        "title": "CodeAudit: Open Last Report"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "codeAudit",
+          "title": "CodeAudit",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "codeAudit": [
+        {
+          "id": "codeAuditFindings",
+          "name": "Findings"
+        },
+        {
+          "id": "codeAuditHistory",
+          "name": "Audit History"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "CodeAudit",
+      "properties": {
+        "codeAudit.pythonPath": {
+          "type": "string",
+          "default": "code-audit",
+          "description": "Path to the code-audit CLI executable"
+        },
+        "codeAudit.defaultMode": {
+          "type": "string",
+          "enum": ["quick", "deep", "security"],
+          "default": "quick",
+          "description": "Default review mode"
+        },
+        "codeAudit.autoReviewOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically run a quick review when files are saved"
+        },
+        "codeAudit.diffTarget": {
+          "type": "string",
+          "default": "HEAD",
+          "description": "Default git ref to diff against"
+        }
+      }
+    },
+    "menus": {
+      "editor/context": [
+        {
+          "command": "codeAudit.reviewQuick",
+          "group": "codeAudit"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0",
+    "@vscode/vsce": "^3.0.0"
+  }
+}

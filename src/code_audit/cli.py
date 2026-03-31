@@ -11,6 +11,7 @@ Usage:
 from __future__ import annotations
 
 import asyncio
+import os
 from enum import Enum
 from pathlib import Path
 from typing import Optional
@@ -271,6 +272,88 @@ _EXAMPLE_REVIEW_MD = """\
 - Formatting-only changes in *.lock files
 - Third-party vendored code
 """
+
+
+@app.command()
+def serve(
+    port: int = typer.Option(8900, "--port", help="Port for the webhook server"),
+    host: str = typer.Option("0.0.0.0", "--host", help="Host to bind to"),
+) -> None:
+    """Start the GitHub webhook server for automatic PR reviews.
+
+    Requires GITHUB_TOKEN env var. Optionally set CODE_AUDIT_WEBHOOK_SECRET
+    for signature verification.
+    """
+    import uvicorn
+
+    from code_audit.github.webhook import create_webhook_app
+
+    if not os.environ.get("GITHUB_TOKEN"):
+        console.print("[red]Error: GITHUB_TOKEN environment variable is required[/red]")
+        raise typer.Exit(1)
+
+    console.print(f"[bold]CodeAudit Webhook Server[/bold]")
+    console.print(f"Listening on http://{host}:{port}/webhook")
+    console.print(f"Health check: http://{host}:{port}/health")
+    console.print()
+
+    webhook_app = create_webhook_app()
+    uvicorn.run(webhook_app, host=host, port=port, log_level="info")
+
+
+@app.command()
+def review_pr(
+    repo: str = typer.Argument(help="Repository in owner/name format"),
+    pr: int = typer.Argument(help="Pull request number"),
+    mode: ReviewModeChoice = typer.Option(
+        ReviewModeChoice.deep, "--mode", "-m",
+        help="Review mode",
+    ),
+) -> None:
+    """Review a specific GitHub pull request and post findings as comments.
+
+    Requires GITHUB_TOKEN env var with repo permissions.
+
+    Example: code-audit review-pr owner/repo 123
+    """
+    github_token = os.environ.get("GITHUB_TOKEN", "")
+    if not github_token:
+        console.print("[red]Error: GITHUB_TOKEN environment variable is required[/red]")
+        raise typer.Exit(1)
+
+    parts = repo.split("/")
+    if len(parts) != 2:
+        console.print("[red]Error: repo must be in owner/name format[/red]")
+        raise typer.Exit(1)
+
+    owner, repo_name = parts
+    mode_map = {
+        ReviewModeChoice.quick: ReviewMode.QUICK,
+        ReviewModeChoice.deep: ReviewMode.DEEP,
+        ReviewModeChoice.security: ReviewMode.SECURITY,
+    }
+
+    from code_audit.config.models import ReviewMode
+    from code_audit.github.webhook import handle_pr_event
+    from code_audit.github.client import GitHubClient
+
+    async def _run():
+        client = GitHubClient(token=github_token)
+        try:
+            pr_data = await client.get_pr(owner, repo_name, pr)
+            repo_data = {"owner": {"login": owner}, "name": repo_name, "clone_url": f"https://github.com/{owner}/{repo_name}.git"}
+            result = await handle_pr_event(
+                action="cli_triggered",
+                pr_data=pr_data,
+                repo_data=repo_data,
+                github_token=github_token,
+                review_mode=mode_map[mode],
+            )
+            console.print(f"[green]Review complete![/green] {result['findings']} findings posted to PR #{pr}")
+        finally:
+            await client.close()
+
+    asyncio.run(_run())
 
 
 if __name__ == "__main__":

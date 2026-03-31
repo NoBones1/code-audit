@@ -1,0 +1,130 @@
+# CodeAudit — Multi-Agent AI Code Review
+# Drop this file into your repo at .github/workflows/code-audit.yml
+#
+# Required secrets:
+#   ANTHROPIC_API_KEY — for Claude-powered reviews
+#   or GEMINI_API_KEY — for Gemini-powered reviews
+#
+# Optional secrets:
+#   CODE_AUDIT_MODE — review mode: quick (default for pushes), deep, security
+
+name: CodeAudit Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+  issue_comment:
+    types: [created]
+
+# Cancel in-progress reviews when a new push arrives
+concurrency:
+  group: code-audit-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+jobs:
+  review:
+    # Run on PR events, or on @code-audit comments
+    if: >
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request &&
+       contains(github.event.comment.body, '@code-audit'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for accurate diffs
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install CodeAudit
+        run: pip install code-audit
+
+      - name: Determine review mode
+        id: mode
+        run: |
+          MODE="${{ vars.CODE_AUDIT_MODE || 'quick' }}"
+          # Override to deep if manually triggered via comment
+          if [[ "${{ github.event_name }}" == "issue_comment" ]]; then
+            COMMENT="${{ github.event.comment.body }}"
+            if echo "$COMMENT" | grep -qi "deep"; then
+              MODE="deep"
+            elif echo "$COMMENT" | grep -qi "security"; then
+              MODE="security"
+            fi
+          fi
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+
+      - name: Run CodeAudit review
+        id: audit
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          # Determine diff target
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            DIFF_TARGET="origin/${{ github.event.pull_request.base.ref }}"
+          else
+            DIFF_TARGET="origin/${{ github.event.repository.default_branch }}"
+          fi
+
+          code-audit review \
+            --mode ${{ steps.mode.outputs.mode }} \
+            --diff-target "$DIFF_TARGET" \
+            --path .
+
+          echo "sarif_path=.audit/results.sarif" >> "$GITHUB_OUTPUT"
+          echo "report_path=.audit/report.md" >> "$GITHUB_OUTPUT"
+
+      - name: Post review summary as PR comment
+        if: always() && hashFiles('.audit/report.md') != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('.audit/report.md', 'utf8');
+
+            // Truncate if too long for a comment
+            const maxLen = 60000;
+            const body = report.length > maxLen
+              ? report.substring(0, maxLen) + '\n\n*... truncated*'
+              : report;
+
+            const prNumber = context.issue?.number || context.payload.pull_request?.number;
+            if (prNumber) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: body,
+              });
+            }
+
+      - name: Upload SARIF to GitHub Code Scanning
+        if: always() && hashFiles('.audit/results.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: .audit/results.sarif
+          category: code-audit
+        continue-on-error: true  # Don't fail if Code Scanning isn't enabled
+
+      - name: Upload audit artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-audit-report
+          path: |
+            .audit/report.md
+            .audit/results.sarif
+          retention-days: 30

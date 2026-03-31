@@ -27,9 +27,15 @@ class BaseReviewAgent:
     dimension: str = ""  # Override in subclasses
     prompt_file: str = ""  # Override in subclasses
 
-    def __init__(self, llm: LLMProvider, extra_instructions: str | None = None):
+    def __init__(
+        self,
+        llm: LLMProvider,
+        extra_instructions: str | None = None,
+        memory_context: str | None = None,
+    ):
         self.llm = llm
         self.extra_instructions = extra_instructions
+        self.memory_context = memory_context  # Injected from ProjectMemory
         self._system_prompt_template = self._load_prompt()
 
     def _load_prompt(self) -> str:
@@ -55,6 +61,10 @@ class BaseReviewAgent:
         # Inject project context (CLAUDE.md)
         project_ctx = context.project_context or "No project context file (CLAUDE.md) found."
         prompt = prompt.replace("{{PROJECT_CONTEXT}}", project_ctx)
+
+        # Inject project memory (learned team preferences)
+        if self.memory_context:
+            prompt += f"\n\n## Team Memory (learned from past reviews)\n{self.memory_context}"
 
         # Append extra instructions if provided
         if self.extra_instructions:
