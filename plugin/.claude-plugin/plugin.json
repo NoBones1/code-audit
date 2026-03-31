@@ -1,0 +1,7 @@
+{
+  "name": "code-audit",
+  "description": "Multi-agent AI code review plugin. Spawns 5 specialist agents (security, architecture, performance, correctness, maintainability) in parallel to audit code across all dimensions, then aggregates findings through a judge pass. Outputs severity-ranked findings with remediation suggestions, markdown reports, and SARIF 2.1.0 JSON.",
+  "author": {
+    "name": "Lokesh Soni"
+  }
+}
