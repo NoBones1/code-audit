@@ -62,6 +62,10 @@ class BaseReviewAgent:
         project_ctx = context.project_context or "No project context file (CLAUDE.md) found."
         prompt = prompt.replace("{{PROJECT_CONTEXT}}", project_ctx)
 
+        # Inject dependency analysis context
+        if context.dependency_context:
+            prompt += f"\n\n## Dependency Analysis\n{context.dependency_context}"
+
         # Inject project memory (learned team preferences)
         if self.memory_context:
             prompt += f"\n\n## Team Memory (learned from past reviews)\n{self.memory_context}"

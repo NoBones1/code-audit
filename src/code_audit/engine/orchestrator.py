@@ -29,6 +29,7 @@ from code_audit.context.diff import extract_diffs
 from code_audit.context.file_reader import read_changed_files
 from code_audit.context.review_md import find_claude_md, parse_review_md
 from code_audit.engine.state import AuditState
+from code_audit.graph.analyzer import CodeGraphAnalyzer
 from code_audit.llm.registry import create_provider
 from code_audit.memory.decisions import DecisionTracker
 from code_audit.memory.store import ProjectMemory
@@ -206,6 +207,20 @@ class Orchestrator:
         review_rules = parse_review_md(self.project_path)
         project_context = find_claude_md(self.project_path)
 
+        # Build code graph for dependency analysis
+        dependency_context = ""
+        try:
+            graph_analyzer = CodeGraphAnalyzer(self.project_path)
+            code_graph = graph_analyzer.analyze(
+                changed_files=changed_paths,
+                include_neighbors=True,
+                max_files=30,
+            )
+            if code_graph.total_symbols > 0:
+                dependency_context = code_graph.format_for_prompt(changed_paths)
+        except Exception:
+            pass  # Code graph is a nice-to-have, not a blocker
+
         total_add = sum(d.additions for d in filtered_diffs)
         total_del = sum(d.deletions for d in filtered_diffs)
 
@@ -218,6 +233,7 @@ class Orchestrator:
             changed_files=changed_files,
             review_rules=review_rules,
             project_context=project_context,
+            dependency_context=dependency_context,
             diff_target=self.config.review.diff_target,
             total_additions=total_add,
             total_deletions=total_del,

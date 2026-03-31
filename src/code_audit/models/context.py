@@ -97,6 +97,10 @@ class ReviewContext(BaseModel):
         default=None,
         description="CLAUDE.md contents if present",
     )
+    dependency_context: str = Field(
+        default="",
+        description="Code graph / dependency analysis context for agents",
+    )
     diff_target: str = Field(
         default="HEAD",
         description="What we're diffing against (branch, commit, HEAD)",

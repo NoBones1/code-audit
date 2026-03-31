@@ -25,6 +25,12 @@ dependencies = [
 
     # SARIF output
     "sarif-pydantic>=0.6.0",
+
+    # Code graph / dependency analysis
+    "tree-sitter>=0.23.0",
+    "tree-sitter-python>=0.23.0",
+    "tree-sitter-javascript>=0.23.0",
+    "tree-sitter-typescript>=0.23.0",
 ]
 
 [project.optional-dependencies]
