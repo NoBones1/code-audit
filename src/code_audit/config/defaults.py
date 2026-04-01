@@ -3,11 +3,11 @@
 from code_audit.config.models import AuditConfig, LLMConfig, LLMProvider
 
 # Default provider chain: NVIDIA → Gemini → OpenRouter
-# All free-tier, no cost. NVIDIA is fastest with 30 RPM + 5000 RPD.
+# All free-tier, no cost. Kimi K2.5 chosen for best code reasoning (SWE-Bench #2).
 DEFAULT_CONFIG = AuditConfig(
     llm=LLMConfig(
         provider=LLMProvider.NVIDIA,
-        model="nvidia/nemotron-3-super-120b-a12b",
+        model="moonshotai/kimi-k2.5",
         api_key_env="NVIDIA_API_KEY",
         fallbacks=[
             LLMConfig(

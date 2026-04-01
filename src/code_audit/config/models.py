@@ -31,7 +31,7 @@ class LLMConfig(BaseModel):
     """Configuration for an LLM provider."""
 
     provider: LLMProvider = LLMProvider.NVIDIA
-    model: str = "nvidia/nemotron-3-super-120b-a12b"
+    model: str = "moonshotai/kimi-k2.5"
     api_key_env: str = "NVIDIA_API_KEY"
     base_url: str | None = None  # Auto-set for NVIDIA; required for openai_compat
     temperature: float = Field(default=0.2, ge=0.0, le=2.0)
