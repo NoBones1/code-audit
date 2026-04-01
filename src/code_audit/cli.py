@@ -19,6 +19,13 @@ from typing import Optional
 import typer
 from rich.console import Console
 
+# Load .env file if present (for API keys)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # python-dotenv not installed — rely on shell-exported env vars
+
 from code_audit import __version__
 
 app = typer.Typer(

@@ -30,6 +30,7 @@ from code_audit.context.file_reader import read_changed_files
 from code_audit.context.review_md import find_claude_md, parse_review_md
 from code_audit.engine.state import AuditState
 from code_audit.graph.analyzer import CodeGraphAnalyzer
+from code_audit.llm.fallback import FallbackProvider
 from code_audit.llm.registry import create_provider
 from code_audit.memory.decisions import DecisionTracker
 from code_audit.memory.store import ProjectMemory
@@ -109,7 +110,7 @@ class Orchestrator:
                 self.state.update_agent_status("judge", "running")
 
                 judge_llm_config = self.config.llm_for_agent("judge")
-                judge_provider = create_provider(judge_llm_config)
+                judge_provider = FallbackProvider(judge_llm_config)
                 judge = JudgeAgent(judge_provider)
 
                 final_findings, judge_summary, judge_duration = await judge.judge(
@@ -127,7 +128,7 @@ class Orchestrator:
             # Phase 4: Build report
             total_duration = time.monotonic() - start_time
             providers_used = list({
-                create_provider(self.config.llm_for_agent(name)).provider_name
+                FallbackProvider(self.config.llm_for_agent(name)).provider_name
                 for name in (["combined"] if self.config.review.mode == ReviewMode.QUICK
                              else list(SPECIALIST_AGENTS.keys()))
                 if self.config.is_agent_enabled(name)
@@ -316,7 +317,7 @@ class Orchestrator:
         self.state.update_agent_status(agent_name, "running")
 
         llm_config = self.config.llm_for_agent(agent_name)
-        provider = create_provider(llm_config)
+        provider = FallbackProvider(llm_config)
         memory_ctx = self.memory.format_for_prompt() or None
         agent = CombinedAgent(llm=provider, memory_context=memory_ctx)
 
@@ -361,7 +362,7 @@ class Orchestrator:
 
         for name, agent_cls in agents.items():
             llm_config = self.config.llm_for_agent(name)
-            provider = create_provider(llm_config)
+            provider = FallbackProvider(llm_config)
 
             extra = None
             agent_cfg = self.config.agents.get(name)
@@ -393,7 +394,7 @@ class Orchestrator:
                 important=sum(1 for f in findings if f.severity.value == "important"),
                 nit=sum(1 for f in findings if f.severity.value == "nit"),
                 pre_existing=sum(1 for f in findings if f.severity.value == "pre_existing"),
-                agent_model=create_provider(self.config.llm_for_agent(name)).model_name,
+                agent_model=FallbackProvider(self.config.llm_for_agent(name)).model_name,
                 duration_seconds=duration,
             ))
 

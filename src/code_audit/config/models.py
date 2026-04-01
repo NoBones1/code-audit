@@ -12,6 +12,7 @@ class LLMProvider(str, Enum):
     CLAUDE = "claude"
     GEMINI = "gemini"
     OPENAI_COMPAT = "openai_compat"
+    NVIDIA = "nvidia"  # Shorthand for NVIDIA Build (OpenAI-compat)
 
 
 class ReviewMode(str, Enum):
@@ -29,12 +30,15 @@ class OutputFormat(str, Enum):
 class LLMConfig(BaseModel):
     """Configuration for an LLM provider."""
 
-    provider: LLMProvider = LLMProvider.CLAUDE
-    model: str = "claude-sonnet-4-6"
-    api_key_env: str = "ANTHROPIC_API_KEY"
-    base_url: str | None = None  # For openai_compat
+    provider: LLMProvider = LLMProvider.NVIDIA
+    model: str = "nvidia/nemotron-3-super-120b-a12b"
+    api_key_env: str = "NVIDIA_API_KEY"
+    base_url: str | None = None  # Auto-set for NVIDIA; required for openai_compat
     temperature: float = Field(default=0.2, ge=0.0, le=2.0)
     max_tokens: int = Field(default=8192, ge=256)
+
+    # Fallback providers tried in order if the primary fails
+    fallbacks: list["LLMConfig"] = Field(default_factory=list)
 
 
 class AgentConfig(BaseModel):

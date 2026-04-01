@@ -90,7 +90,7 @@ def test_full_pipeline_with_mock():
         mock_provider.provider_name = "mock"
         mock_provider.complete_structured = AsyncMock(return_value=MOCK_RESPONSE)
 
-        with patch("code_audit.engine.orchestrator.create_provider", return_value=mock_provider):
+        with patch("code_audit.engine.orchestrator.FallbackProvider", return_value=mock_provider):
             orchestrator = Orchestrator(config=config, project_path=project)
             report = asyncio.run(orchestrator.run())
 

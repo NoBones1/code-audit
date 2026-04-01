@@ -34,13 +34,20 @@ def create_provider(config: LLMConfig) -> LLMProvider:
             api_key_env=config.api_key_env,
         )
 
-    elif config.provider == LLMProviderEnum.OPENAI_COMPAT:
+    elif config.provider in (LLMProviderEnum.OPENAI_COMPAT, LLMProviderEnum.NVIDIA):
         from code_audit.llm.openai_compat import OpenAICompatProvider
+
+        # NVIDIA uses its own base URL and key env var
+        base_url = config.base_url
+        api_key_env = config.api_key_env
+        if config.provider == LLMProviderEnum.NVIDIA:
+            base_url = base_url or "https://integrate.api.nvidia.com/v1"
+            api_key_env = api_key_env if api_key_env != "ANTHROPIC_API_KEY" else "NVIDIA_API_KEY"
 
         return OpenAICompatProvider(
             model=config.model,
-            api_key_env=config.api_key_env,
-            base_url=config.base_url,
+            api_key_env=api_key_env,
+            base_url=base_url,
         )
 
     else:

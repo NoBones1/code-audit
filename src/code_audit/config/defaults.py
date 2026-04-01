@@ -1,8 +1,29 @@
 """Default configuration values."""
 
-from code_audit.config.models import AuditConfig
+from code_audit.config.models import AuditConfig, LLMConfig, LLMProvider
 
-DEFAULT_CONFIG = AuditConfig()
+# Default provider chain: NVIDIA → Gemini → OpenRouter
+# All free-tier, no cost. NVIDIA is fastest with 30 RPM + 5000 RPD.
+DEFAULT_CONFIG = AuditConfig(
+    llm=LLMConfig(
+        provider=LLMProvider.NVIDIA,
+        model="nvidia/nemotron-3-super-120b-a12b",
+        api_key_env="NVIDIA_API_KEY",
+        fallbacks=[
+            LLMConfig(
+                provider=LLMProvider.GEMINI,
+                model="gemini-2.5-flash",
+                api_key_env="GEMINI_API_KEY",
+            ),
+            LLMConfig(
+                provider=LLMProvider.OPENAI_COMPAT,
+                model="meta-llama/llama-3.3-70b-instruct:free",
+                api_key_env="OPENROUTER_API_KEY_PAID",
+                base_url="https://openrouter.ai/api/v1",
+            ),
+        ],
+    ),
+)
 
 # File extensions → language mapping
 EXTENSION_LANGUAGE_MAP: dict[str, str] = {
