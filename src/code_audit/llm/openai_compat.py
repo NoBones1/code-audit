@@ -71,6 +71,11 @@ class OpenAICompatProvider(LLMProvider):
             )
             response.raise_for_status()
             data = response.json()
+            usage = data.get("usage", {})
+            self._last_usage = {
+                "input_tokens": usage.get("prompt_tokens", 0),
+                "output_tokens": usage.get("completion_tokens", 0),
+            }
             return data["choices"][0]["message"]["content"]
 
     async def complete_structured(
@@ -116,6 +121,11 @@ class OpenAICompatProvider(LLMProvider):
             )
             response.raise_for_status()
             data = response.json()
+            usage = data.get("usage", {})
+            self._last_usage = {
+                "input_tokens": usage.get("prompt_tokens", 0),
+                "output_tokens": usage.get("completion_tokens", 0),
+            }
             text = data["choices"][0]["message"]["content"]
 
             # Strip markdown code blocks if present

@@ -71,6 +71,11 @@ def review(
         "--no-markdown",
         help="Skip markdown report generation",
     ),
+    no_reflect: bool = typer.Option(
+        False,
+        "--no-reflect",
+        help="Skip agent self-reflection pass",
+    ),
 ) -> None:
     """Run a multi-agent code review on the project."""
     from code_audit.config.loader import load_config
@@ -101,6 +106,8 @@ def review(
         config.output.formats = [f for f in config.output.formats if f != OutputFormat.SARIF]
     if no_markdown:
         config.output.formats = [f for f in config.output.formats if f != OutputFormat.MARKDOWN]
+    if no_reflect:
+        config.review.no_reflect = no_reflect
 
     # Run the audit
     asyncio.run(_run_audit(config, project_path))
@@ -163,6 +170,7 @@ async def _run_audit(config, project_path: Path) -> None:
 
     # Print report to terminal
     terminal.print_report(report)
+    terminal.print_cost_summary(report)
 
     # Write output files
     output_dir = project_path / config.output.directory
@@ -211,15 +219,321 @@ def init(
         config_path.write_text(_EXAMPLE_CONFIG, encoding="utf-8")
         console.print(f"[green]Created {config_path}[/green]")
 
-    # Create REVIEW.md
+    # Create REVIEW.md (auto-detect project type for tailored template)
     review_path = project_path / "REVIEW.md"
     if review_path.exists():
         console.print(f"[yellow]{review_path} already exists, skipping[/yellow]")
     else:
-        review_path.write_text(_EXAMPLE_REVIEW_MD, encoding="utf-8")
-        console.print(f"[green]Created {review_path}[/green]")
+        detected = _detect_project_type(project_path)
+        review_content = _generate_review_md(detected)
+        review_path.write_text(review_content, encoding="utf-8")
+        if detected["languages"]:
+            console.print(
+                f"[green]Created {review_path}[/green] "
+                f"(detected: {', '.join(detected['languages'][:4])})"
+            )
+        else:
+            console.print(f"[green]Created {review_path}[/green]")
 
     console.print("\n[bold]Setup complete![/bold] Edit these files to customize your review rules.")
+
+
+def _detect_project_type(project_path: Path) -> dict:
+    """Detect languages, frameworks, and infrastructure from a project directory."""
+    import json
+
+    languages: set[str] = set()
+    frameworks: set[str] = set()
+    has_docker = False
+    has_ci = False
+
+    # Extension → language mapping
+    ext_map = {
+        ".py": "Python",
+        ".ts": "TypeScript",
+        ".tsx": "TypeScript",
+        ".js": "JavaScript",
+        ".jsx": "JavaScript",
+        ".go": "Go",
+        ".rs": "Rust",
+        ".java": "Java",
+        ".rb": "Ruby",
+        ".php": "PHP",
+        ".cs": "C#",
+        ".swift": "Swift",
+        ".kt": "Kotlin",
+    }
+
+    # Scan top-level and one level deep for file extensions
+    for p in project_path.iterdir():
+        if p.name.startswith("."):
+            continue
+        if p.is_file():
+            lang = ext_map.get(p.suffix.lower())
+            if lang:
+                languages.add(lang)
+        elif p.is_dir() and not p.name.startswith("node_modules"):
+            try:
+                for child in p.iterdir():
+                    if child.is_file():
+                        lang = ext_map.get(child.suffix.lower())
+                        if lang:
+                            languages.add(lang)
+            except PermissionError:
+                pass
+
+    # Detect Docker
+    if (project_path / "Dockerfile").exists() or (project_path / "docker-compose.yml").exists():
+        has_docker = True
+
+    # Detect CI
+    if (project_path / ".github" / "workflows").is_dir():
+        has_ci = True
+    elif (project_path / ".gitlab-ci.yml").exists():
+        has_ci = True
+
+    # Detect frameworks from package.json
+    pkg_json = project_path / "package.json"
+    if pkg_json.exists():
+        try:
+            pkg = json.loads(pkg_json.read_text(encoding="utf-8"))
+            all_deps = {**pkg.get("dependencies", {}), **pkg.get("devDependencies", {})}
+            if "react" in all_deps:
+                frameworks.add("React")
+            if "next" in all_deps:
+                frameworks.add("Next.js")
+            if "vue" in all_deps:
+                frameworks.add("Vue")
+            if "express" in all_deps:
+                frameworks.add("Express")
+            if "angular" in all_deps or "@angular/core" in all_deps:
+                frameworks.add("Angular")
+            if "svelte" in all_deps:
+                frameworks.add("Svelte")
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    # Detect frameworks from pyproject.toml / requirements.txt
+    pyproject = project_path / "pyproject.toml"
+    requirements = project_path / "requirements.txt"
+    py_deps_text = ""
+    if pyproject.exists():
+        try:
+            py_deps_text = pyproject.read_text(encoding="utf-8").lower()
+        except OSError:
+            pass
+    if requirements.exists():
+        try:
+            py_deps_text += "\n" + requirements.read_text(encoding="utf-8").lower()
+        except OSError:
+            pass
+
+    if py_deps_text:
+        if "fastapi" in py_deps_text:
+            frameworks.add("FastAPI")
+        if "django" in py_deps_text:
+            frameworks.add("Django")
+        if "flask" in py_deps_text:
+            frameworks.add("Flask")
+        if "sqlalchemy" in py_deps_text:
+            frameworks.add("SQLAlchemy")
+        if "celery" in py_deps_text:
+            frameworks.add("Celery")
+
+    # Detect Go frameworks from go.mod
+    go_mod = project_path / "go.mod"
+    if go_mod.exists():
+        try:
+            go_text = go_mod.read_text(encoding="utf-8").lower()
+            if "gin-gonic" in go_text:
+                frameworks.add("Gin")
+            if "gorilla/mux" in go_text:
+                frameworks.add("Gorilla Mux")
+        except OSError:
+            pass
+
+    # Detect Rust frameworks from Cargo.toml
+    cargo = project_path / "Cargo.toml"
+    if cargo.exists():
+        try:
+            cargo_text = cargo.read_text(encoding="utf-8").lower()
+            if "actix" in cargo_text:
+                frameworks.add("Actix")
+            if "tokio" in cargo_text:
+                frameworks.add("Tokio")
+            if "axum" in cargo_text:
+                frameworks.add("Axum")
+        except OSError:
+            pass
+
+    return {
+        "languages": sorted(languages),
+        "frameworks": sorted(frameworks),
+        "has_docker": has_docker,
+        "has_ci": has_ci,
+    }
+
+
+def _generate_review_md(detected: dict) -> str:
+    """Generate a REVIEW.md template tailored to the detected project type."""
+    languages: list[str] = detected.get("languages", [])
+    frameworks: list[str] = detected.get("frameworks", [])
+    has_docker: bool = detected.get("has_docker", False)
+    has_ci: bool = detected.get("has_ci", False)
+
+    lines: list[str] = [
+        "# Code Review Guidelines",
+        "",
+        "## Always check",
+        "- New API endpoints have corresponding integration tests",
+        "- Database migrations are backward-compatible",
+        "- Error messages don't leak internal details to users",
+        "- Authentication checks are present on protected routes",
+    ]
+
+    # Language-specific rules
+    if "Python" in languages:
+        lines += [
+            "",
+            "## Python",
+            "- Type hints on public APIs",
+            "- No bare except clauses",
+            "- Use pathlib instead of os.path for file operations",
+            "- Async functions should not block the event loop",
+        ]
+
+    if "TypeScript" in languages or "JavaScript" in languages:
+        lines += [
+            "",
+            "## TypeScript / JavaScript",
+            "- Strict mode enabled",
+            "- No `any` types in production code",
+            "- Prefer `const` over `let`; never use `var`",
+            "- Async/await over raw promises where possible",
+        ]
+
+    if "Go" in languages:
+        lines += [
+            "",
+            "## Go",
+            "- Error handling -- never ignore errors",
+            "- Context propagation through function chains",
+            "- Use `errors.Is` / `errors.As` instead of direct comparison",
+            "- Goroutine leaks: ensure goroutines can exit",
+        ]
+
+    if "Rust" in languages:
+        lines += [
+            "",
+            "## Rust",
+            "- Prefer `Result` over `unwrap()` in library code",
+            "- Minimize use of `unsafe` blocks",
+            "- Proper lifetime annotations on public APIs",
+            "- Use `clippy` lints as guidance",
+        ]
+
+    if "Java" in languages:
+        lines += [
+            "",
+            "## Java",
+            "- Null safety: use `Optional` over nullable returns",
+            "- Close resources with try-with-resources",
+            "- Prefer immutable collections where possible",
+            "- Follow Java naming conventions strictly",
+        ]
+
+    # Framework-specific rules
+    if "React" in frameworks:
+        lines += [
+            "",
+            "## React",
+            "- Hooks rules compliance (no conditional hooks)",
+            "- No direct DOM manipulation",
+            "- Memoize expensive computations with useMemo/useCallback",
+            "- Key props on list items",
+        ]
+
+    if "Next.js" in frameworks:
+        lines += [
+            "",
+            "## Next.js",
+            "- Server vs client component boundaries are intentional",
+            "- No secrets in client-side code",
+            "- Use next/image for images, next/link for navigation",
+        ]
+
+    if "Django" in frameworks:
+        lines += [
+            "",
+            "## Django",
+            "- CSRF protection on forms",
+            "- SQL injection prevention: use ORM queries, no raw SQL",
+            "- No secrets in settings.py; use environment variables",
+            "- Permission checks on views",
+        ]
+
+    if "FastAPI" in frameworks:
+        lines += [
+            "",
+            "## FastAPI",
+            "- CSRF protection on forms",
+            "- SQL injection prevention via parameterized queries",
+            "- Pydantic models for request/response validation",
+            "- Dependency injection for shared resources",
+        ]
+
+    if "Flask" in frameworks:
+        lines += [
+            "",
+            "## Flask",
+            "- CSRF protection on forms",
+            "- SQL injection prevention: use parameterized queries",
+            "- No secrets in app config; use environment variables",
+        ]
+
+    if "Express" in frameworks:
+        lines += [
+            "",
+            "## Express",
+            "- Input validation and sanitization on all routes",
+            "- Helmet.js or equivalent security headers",
+            "- Rate limiting on public endpoints",
+        ]
+
+    # Infrastructure rules
+    if has_docker:
+        lines += [
+            "",
+            "## Docker",
+            "- No secrets in Dockerfiles or docker-compose",
+            "- Use multi-stage builds for production images",
+            "- Pin base image versions (no `latest` tag)",
+        ]
+
+    if has_ci:
+        lines += [
+            "",
+            "## CI/CD",
+            "- CI pipeline changes should be reviewed by a second person",
+            "- No hardcoded secrets in workflow files",
+        ]
+
+    # Standard sections always present
+    lines += [
+        "",
+        "## Style",
+        "- Prefer early returns over nested conditionals",
+        "- Use structured logging, not string interpolation in log calls",
+        "- Constants should be UPPER_SNAKE_CASE",
+        "",
+        "## Skip",
+        "- Generated files under src/gen/",
+        "- Formatting-only changes in *.lock files",
+        "- Third-party vendored code",
+        "",
+    ]
+
+    return "\n".join(lines)
 
 
 _EXAMPLE_CONFIG = """\
@@ -260,25 +574,6 @@ output:
   directory: .audit
 """
 
-_EXAMPLE_REVIEW_MD = """\
-# Code Review Guidelines
-
-## Always check
-- New API endpoints have corresponding integration tests
-- Database migrations are backward-compatible
-- Error messages don't leak internal details to users
-- Authentication checks are present on protected routes
-
-## Style
-- Prefer early returns over nested conditionals
-- Use structured logging, not string interpolation in log calls
-- Constants should be UPPER_SNAKE_CASE
-
-## Skip
-- Generated files under src/gen/
-- Formatting-only changes in *.lock files
-- Third-party vendored code
-"""
 
 
 @app.command()

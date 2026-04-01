@@ -45,17 +45,41 @@ def render_markdown_report(report: AuditReport) -> str:
     if s.dimension_summaries:
         lines.append("### By Dimension")
         lines.append("")
-        lines.append("| Dimension | Findings | Important | Nit | Pre-existing | Model | Duration |")
-        lines.append("|-----------|----------|-----------|-----|-------------|-------|----------|")
+        lines.append("| Dimension | Findings | Important | Nit | Pre-existing | Avg Confidence | Model | Duration |")
+        lines.append("|-----------|----------|-----------|-----|-------------|---------------|-------|----------|")
         for ds in s.dimension_summaries:
             lines.append(
                 f"| {ds.dimension} | {ds.total_findings} | {ds.important} | "
-                f"{ds.nit} | {ds.pre_existing} | {ds.agent_model} | {ds.duration_seconds:.1f}s |"
+                f"{ds.nit} | {ds.pre_existing} | {ds.avg_confidence:.0%} | {ds.agent_model} | {ds.duration_seconds:.1f}s |"
             )
         lines.append("")
 
     if not report.findings:
         return "\n".join(lines)
+
+    # Secrets scan results
+    secrets = [f for f in report.findings if f.dimension == "secrets"]
+    if secrets:
+        lines.append("\n## Secrets Scan\n")
+        lines.append(f"Found **{len(secrets)}** potential secrets/credentials:\n")
+        for f in secrets:
+            lines.append(f"### {f.severity.emoji} {f.title}")
+            lines.append(f"**{f.location.display}** | Confidence: {f.confidence:.0%}")
+            lines.append(f"\n{f.description}\n")
+            if f.suggestion:
+                lines.append(f"> **Action**: {f.suggestion}\n")
+
+    # Dependency vulnerability scan results
+    dep_vulns = [f for f in report.findings if f.dimension == "dependencies"]
+    if dep_vulns:
+        lines.append("\n## Dependency Vulnerabilities\n")
+        lines.append(f"Found **{len(dep_vulns)}** vulnerable dependencies:\n")
+        for f in dep_vulns:
+            lines.append(f"### {f.severity.emoji} {f.title}")
+            lines.append(f"**{f.location.display}** | Confidence: {f.confidence:.0%}")
+            lines.append(f"\n{f.description}\n")
+            if f.suggestion:
+                lines.append(f"> **Action**: {f.suggestion}\n")
 
     # Findings by severity
     findings_by_severity = report.findings_by_severity
@@ -92,6 +116,24 @@ def render_markdown_report(report: AuditReport) -> str:
 
             lines.append("---")
             lines.append("")
+
+    # Cost breakdown
+    if report.usage:
+        lines.append("\n## Cost Breakdown\n")
+        lines.append("| Agent | Model | Input Tokens | Output Tokens | Cost |")
+        lines.append("|-------|-------|-------------|--------------|------|")
+        for record in report.usage:
+            cost_str = f"${record.cost_usd:.4f}" if record.cost_usd > 0 else "$0.00"
+            model_short = record.model.split("/")[-1] if "/" in record.model else record.model
+            lines.append(f"| {record.agent_name.title()} | {model_short} | {record.input_tokens:,} | {record.output_tokens:,} | {cost_str} |")
+
+        total_input = sum(r.input_tokens for r in report.usage)
+        total_output = sum(r.output_tokens for r in report.usage)
+        total_cost = f"${report.total_cost_usd:.4f}" if report.total_cost_usd > 0 else "$0.00"
+        lines.append(f"| **Total** | | **{total_input:,}** | **{total_output:,}** | **{total_cost}** |")
+
+        if report.total_cost_usd == 0:
+            lines.append(f"\n*All agents used free-tier providers. No charges incurred.*")
 
     # Footer
     lines.append("")

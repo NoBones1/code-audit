@@ -10,10 +10,13 @@ Pipeline stages:
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 import uuid
 from pathlib import Path
 from typing import Callable
+
+logger = logging.getLogger(__name__)
 
 from code_audit.agents.architectural import ArchitecturalAgent
 from code_audit.agents.base import BaseReviewAgent
@@ -37,6 +40,7 @@ from code_audit.memory.store import ProjectMemory
 from code_audit.models.context import ReviewContext
 from code_audit.models.finding import Finding
 from code_audit.models.report import AuditReport, AuditSummary, DimensionSummary
+from code_audit.models.usage import UsageRecord, calculate_cost
 
 
 # Agent name → Agent class mapping
@@ -65,6 +69,9 @@ class Orchestrator:
         self.state = AuditState(self.project_path, config.output.directory)
         self.memory = ProjectMemory(self.project_path)
         self.decision_tracker = DecisionTracker(self.project_path)
+
+        # Usage tracking
+        self._usage_records: list[UsageRecord] = []
 
         # Callbacks for terminal UI
         self.on_agent_start = on_agent_start or (lambda name: None)
@@ -96,6 +103,33 @@ class Orchestrator:
                 self.state.mark_completed(0, report.duration_seconds)
                 return report
 
+            # Phase 0: Secrets scan (deterministic, no LLM cost)
+            secrets_findings: list[Finding] = []
+            if context.changed_files:
+                try:
+                    from code_audit.scanners.secrets import SecretsScanner
+                    scanner = SecretsScanner()
+                    secrets_findings = scanner.scan_files(context.changed_files)
+                    if secrets_findings:
+                        self.on_agent_start("secrets")
+                        self.on_agent_complete("secrets", len(secrets_findings), 0.0)
+                except Exception as e:
+                    import logging
+                    logging.getLogger(__name__).warning(f"Secrets scan failed: {e}")
+
+            # Phase 0.5: Dependency vulnerability scan (no LLM cost)
+            dep_findings: list[Finding] = []
+            try:
+                from code_audit.scanners.dependencies import DependencyScanner
+                dep_scanner = DependencyScanner(self.project_path)
+                if dep_scanner.detect_ecosystems():
+                    self.on_agent_start("dependencies")
+                    dep_findings = await dep_scanner.scan()
+                    self.on_agent_complete("dependencies", len(dep_findings), 0.0)
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f"Dependency scan failed: {e}")
+
             # Phase 2: Review (quick or deep)
             if self.config.review.mode == ReviewMode.QUICK:
                 all_findings, dimension_summaries = await self._run_quick(context)
@@ -118,12 +152,33 @@ class Orchestrator:
                     context.review_rules,
                 )
 
+                # Track judge usage
+                judge_usage = judge_provider.last_usage
+                judge_record = UsageRecord(
+                    agent_name="judge",
+                    model=judge_provider.model_name,
+                    provider=judge_provider.provider_name,
+                    input_tokens=judge_usage.get("input_tokens", 0),
+                    output_tokens=judge_usage.get("output_tokens", 0),
+                    cost_usd=calculate_cost(judge_provider.model_name, judge_usage.get("input_tokens", 0), judge_usage.get("output_tokens", 0)),
+                    duration_seconds=judge_duration,
+                )
+                self._usage_records.append(judge_record)
+
                 self.state.update_agent_status(
                     "judge", "completed", len(final_findings), judge_duration
                 )
                 self.on_agent_complete("judge", len(final_findings), judge_duration)
             else:
                 final_findings = all_findings
+
+            # Phase 3.5: Agent self-reflection (deep mode only, >5 findings)
+            if (self.config.review.mode == ReviewMode.DEEP
+                    and len(final_findings) > 5
+                    and not self.config.review.no_reflect):
+                final_findings = await self._run_reflection(final_findings, all_findings)
+
+            final_findings = secrets_findings + dep_findings + final_findings
 
             # Phase 4: Build report
             total_duration = time.monotonic() - start_time
@@ -149,6 +204,8 @@ class Orchestrator:
                 duration_seconds=total_duration,
                 review_rules_applied=context.review_rules is not None,
                 llm_providers_used=providers_used,
+                usage=self._usage_records,
+                total_cost_usd=sum(r.cost_usd for r in self._usage_records),
             )
 
             self.state.save_report(report)
@@ -323,6 +380,19 @@ class Orchestrator:
 
         findings, summary, duration = await agent.review(context)
 
+        # Track usage
+        usage = provider.last_usage
+        record = UsageRecord(
+            agent_name=agent_name,
+            model=provider.model_name,
+            provider=provider.provider_name,
+            input_tokens=usage.get("input_tokens", 0),
+            output_tokens=usage.get("output_tokens", 0),
+            cost_usd=calculate_cost(provider.model_name, usage.get("input_tokens", 0), usage.get("output_tokens", 0)),
+            duration_seconds=duration,
+        )
+        self._usage_records.append(record)
+
         self.state.save_agent_findings(agent_name, findings)
         self.state.update_agent_status(agent_name, "completed", len(findings), duration)
         self.on_agent_complete(agent_name, len(findings), duration)
@@ -335,6 +405,7 @@ class Orchestrator:
             pre_existing=sum(1 for f in findings if f.severity.value == "pre_existing"),
             agent_model=provider.model_name,
             duration_seconds=duration,
+            avg_confidence=sum(f.confidence for f in findings) / len(findings) if findings else 0.0,
         )
 
         return findings, [dim_summary]
@@ -371,7 +442,7 @@ class Orchestrator:
 
             memory_ctx = self.memory.format_for_prompt() or None
             agent = agent_cls(llm=provider, extra_instructions=extra, memory_context=memory_ctx)
-            tasks.append(self._run_single_agent(name, agent, context))
+            tasks.append(self._run_single_agent(name, agent, context, provider=provider))
             agent_names.append(name)
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -395,6 +466,7 @@ class Orchestrator:
                 nit=sum(1 for f in findings if f.severity.value == "nit"),
                 pre_existing=sum(1 for f in findings if f.severity.value == "pre_existing"),
                 agent_model=FallbackProvider(self.config.llm_for_agent(name)).model_name,
+                avg_confidence=sum(f.confidence for f in findings) / len(findings) if findings else 0.0,
                 duration_seconds=duration,
             ))
 
@@ -405,6 +477,7 @@ class Orchestrator:
         name: str,
         agent: BaseReviewAgent,
         context: ReviewContext,
+        provider: LLMProvider | None = None,
     ) -> tuple[list[Finding], str, float]:
         """Run a single agent with status tracking."""
         self.on_agent_start(name)
@@ -412,8 +485,92 @@ class Orchestrator:
 
         findings, summary, duration = await agent.review(context)
 
+        # Track usage
+        if provider is not None:
+            usage = provider.last_usage
+            record = UsageRecord(
+                agent_name=name,
+                model=provider.model_name,
+                provider=provider.provider_name,
+                input_tokens=usage.get("input_tokens", 0),
+                output_tokens=usage.get("output_tokens", 0),
+                cost_usd=calculate_cost(provider.model_name, usage.get("input_tokens", 0), usage.get("output_tokens", 0)),
+                duration_seconds=duration,
+            )
+            self._usage_records.append(record)
+
         self.state.save_agent_findings(name, findings)
         self.state.update_agent_status(name, "completed", len(findings), duration)
         self.on_agent_complete(name, len(findings), duration)
 
         return findings, summary, duration
+
+    async def _run_reflection(
+        self,
+        judged_findings: list[Finding],
+        raw_findings: list[Finding],
+    ) -> list[Finding]:
+        """Run one round of cross-agent self-reflection."""
+        from code_audit.agents.reflector import ReflectionAgent
+
+        # Group judged findings by dimension
+        by_dimension: dict[str, list[Finding]] = {}
+        for f in judged_findings:
+            by_dimension.setdefault(f.dimension, []).append(f)
+
+        # Only reflect on dimensions that had findings
+        tasks = []
+        dimensions = []
+        for dim, findings in by_dimension.items():
+            if dim in ("secrets", "dependencies", "combined"):
+                continue  # Skip non-LLM dimensions
+            llm_config = self.config.llm_for_agent(dim)
+            provider = FallbackProvider(llm_config)
+            agent = ReflectionAgent(llm=provider, dimension=dim)
+
+            self.on_agent_start(f"reflect-{dim}")
+            tasks.append(agent.reflect(findings, judged_findings))
+            dimensions.append((dim, provider))
+
+        if not tasks:
+            return judged_findings
+
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Collect updated findings
+        reflected_findings: list[Finding] = []
+        non_reflected: list[Finding] = []
+
+        reflected_dimensions = set()
+        for i, result in enumerate(results):
+            dim, provider = dimensions[i]
+            if isinstance(result, Exception):
+                logger.warning(f"Reflection failed for {dim}: {result}")
+                # Keep original findings for this dimension
+                reflected_findings.extend(by_dimension[dim])
+                self.on_agent_error(f"reflect-{dim}", str(result))
+            else:
+                updated, duration = result
+                reflected_findings.extend(updated)
+                reflected_dimensions.add(dim)
+
+                # Track usage
+                usage = provider.last_usage
+                record = UsageRecord(
+                    agent_name=f"reflect-{dim}",
+                    model=provider.model_name,
+                    provider=provider.provider_name,
+                    input_tokens=usage.get("input_tokens", 0),
+                    output_tokens=usage.get("output_tokens", 0),
+                    cost_usd=calculate_cost(provider.model_name, usage.get("input_tokens", 0), usage.get("output_tokens", 0)),
+                    duration_seconds=duration,
+                )
+                self._usage_records.append(record)
+                self.on_agent_complete(f"reflect-{dim}", len(updated), duration)
+
+        # Add back findings from dimensions that weren't reflected on
+        for f in judged_findings:
+            if f.dimension not in reflected_dimensions:
+                non_reflected.append(f)
+
+        return reflected_findings + non_reflected

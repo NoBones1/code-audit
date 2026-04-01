@@ -71,6 +71,7 @@ class ReviewConfig(BaseModel):
     max_files: int = Field(default=50, ge=1)
     max_file_size_kb: int = Field(default=500, ge=1)
     diff_target: str = "HEAD"  # Branch, commit, or HEAD
+    no_reflect: bool = False  # Skip agent self-reflection pass
 
 
 class OutputConfig(BaseModel):

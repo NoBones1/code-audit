@@ -57,6 +57,10 @@ class GeminiProvider(LLMProvider):
                 max_output_tokens=max_tokens,
             ),
         )
+        self._last_usage = {
+            "input_tokens": getattr(getattr(response, 'usage_metadata', None), 'prompt_token_count', 0) or 0,
+            "output_tokens": getattr(getattr(response, 'usage_metadata', None), 'candidates_token_count', 0) or 0,
+        }
         return response.text or ""
 
     async def complete_structured(
@@ -82,5 +86,9 @@ class GeminiProvider(LLMProvider):
                 response_json_schema=schema,
             ),
         )
+        self._last_usage = {
+            "input_tokens": getattr(getattr(response, 'usage_metadata', None), 'prompt_token_count', 0) or 0,
+            "output_tokens": getattr(getattr(response, 'usage_metadata', None), 'candidates_token_count', 0) or 0,
+        }
         text = response.text or "{}"
         return response_model.model_validate_json(text)

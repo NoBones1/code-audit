@@ -53,6 +53,10 @@ class ClaudeProvider(LLMProvider):
             system=system_prompt,
             messages=[{"role": "user", "content": user_prompt}],
         )
+        self._last_usage = {
+            "input_tokens": getattr(response.usage, 'input_tokens', 0),
+            "output_tokens": getattr(response.usage, 'output_tokens', 0),
+        }
         # Extract text from response content blocks
         text_parts = []
         for block in response.content:
@@ -95,6 +99,10 @@ class ClaudeProvider(LLMProvider):
                     }
                 },
             )
+            self._last_usage = {
+                "input_tokens": getattr(response.usage, 'input_tokens', 0),
+                "output_tokens": getattr(response.usage, 'output_tokens', 0),
+            }
             # Parse the JSON response
             text = ""
             for block in response.content:
@@ -117,6 +125,10 @@ class ClaudeProvider(LLMProvider):
                 system=json_prompt,
                 messages=[{"role": "user", "content": user_prompt}],
             )
+            self._last_usage = {
+                "input_tokens": getattr(response.usage, 'input_tokens', 0),
+                "output_tokens": getattr(response.usage, 'output_tokens', 0),
+            }
             text = ""
             for block in response.content:
                 if hasattr(block, "text"):

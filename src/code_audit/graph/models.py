@@ -20,6 +20,10 @@ class SymbolKind(str, Enum):
     INTERFACE = "interface"  # TypeScript
     TYPE_ALIAS = "type_alias"  # TypeScript
     COMPONENT = "component"  # React/Vue
+    STRUCT = "struct"  # Go/Rust
+    TRAIT = "trait"  # Rust
+    ENUM_TYPE = "enum_type"  # Rust
+    IMPL = "impl"  # Rust
 
 
 class CodeSymbol(BaseModel):

@@ -80,6 +80,7 @@ class FallbackProvider(LLMProvider):
                     max_tokens=max_tokens,
                 )
                 self._active_index = i
+                self._last_usage = provider.last_usage
                 if i > 0:
                     logger.info(f"Using fallback provider: {provider.provider_name}/{provider.model_name}")
                 return result
@@ -118,6 +119,7 @@ class FallbackProvider(LLMProvider):
                     max_tokens=max_tokens,
                 )
                 self._active_index = i
+                self._last_usage = provider.last_usage
                 if i > 0:
                     logger.info(f"Using fallback provider: {provider.provider_name}/{provider.model_name}")
                 return result

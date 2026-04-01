@@ -34,6 +34,8 @@ AGENT_ICONS = {
     "maintainability": "📐",
     "combined": "🔍",
     "judge": "⚖️ ",
+    "secrets": "🔑",
+    "dependencies": "📦",
 }
 
 
@@ -153,12 +155,19 @@ class TerminalOutput:
             if summary.pre_existing > 0:
                 summary_parts.append(f"🟣 {summary.pre_existing} Pre-existing")
 
+            confidence_line = (
+                f"\nConfidence: avg {summary.avg_confidence:.0%} | "
+                f"High (>80%): {summary.high_confidence_count} | "
+                f"Low (<50%): {summary.low_confidence_count}"
+            )
+
             self.console.print(
                 Panel(
                     f"[bold]{summary.total_findings} findings[/bold] across "
                     f"{summary.files_reviewed} files\n"
                     + " | ".join(summary_parts)
-                    + f"\nDuration: {report.duration_seconds:.1f}s",
+                    + f"\nDuration: {report.duration_seconds:.1f}s"
+                    + confidence_line,
                     title="Audit Complete",
                     border_style="red" if summary.important > 0 else "yellow",
                 )
@@ -211,6 +220,53 @@ class TerminalOutput:
         if sarif_path:
             self.console.print(f"  📊 SARIF: [cyan]{sarif_path}[/cyan]")
         self.console.print()
+
+    def print_cost_summary(self, report: AuditReport) -> None:
+        """Print cost breakdown table."""
+        if not report.usage:
+            return
+
+        from rich.table import Table
+
+        table = Table(title="Cost Breakdown", show_header=True, header_style="bold")
+        table.add_column("Agent", style="cyan")
+        table.add_column("Model")
+        table.add_column("Input", justify="right")
+        table.add_column("Output", justify="right")
+        table.add_column("Cost", justify="right", style="green")
+
+        for record in report.usage:
+            icon = AGENT_ICONS.get(record.agent_name, "")
+            cost_str = f"${record.cost_usd:.4f}" if record.cost_usd > 0 else "$0.00"
+            table.add_row(
+                f"{icon} {record.agent_name.title()}",
+                record.model.split("/")[-1] if "/" in record.model else record.model,
+                f"{record.input_tokens:,} tok",
+                f"{record.output_tokens:,} tok",
+                cost_str,
+            )
+
+        # Total row
+        total_input = sum(r.input_tokens for r in report.usage)
+        total_output = sum(r.output_tokens for r in report.usage)
+        total_cost = f"${report.total_cost_usd:.4f}" if report.total_cost_usd > 0 else "$0.00"
+        table.add_section()
+        table.add_row("Total", "", f"{total_input:,} tok", f"{total_output:,} tok", total_cost)
+
+        self.console.print(table)
+
+        # Summary note
+        if report.total_cost_usd == 0:
+            notes = list({r.pricing_note for r in report.usage})
+            self.console.print(f"  All agents used {', '.join(notes)}. No charges incurred.", style="dim")
+            # Show equivalent cost
+            from code_audit.models.usage import AuditUsageSummary
+            summary = AuditUsageSummary(records=report.usage)
+            equiv = summary.equivalent_cost("claude-sonnet-4-6")
+            if equiv > 0:
+                self.console.print(f"  Equivalent cost on Claude Sonnet: ~${equiv:.2f} | On CodeRabbit: ~$24/month/dev", style="dim")
+        else:
+            self.console.print(f"  Total cost: ${report.total_cost_usd:.4f}", style="bold")
 
     def print_no_changes(self) -> None:
         """Print message when no changes are detected."""

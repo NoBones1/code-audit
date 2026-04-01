@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pydantic import BaseModel, Field
 
 from code_audit.models.finding import Dimension, Finding, Severity
+from code_audit.models.usage import UsageRecord
 
 
 class DimensionSummary(BaseModel):
@@ -19,6 +20,7 @@ class DimensionSummary(BaseModel):
     pre_existing: int = 0
     agent_model: str = ""
     duration_seconds: float = 0.0
+    avg_confidence: float = 0.0
 
 
 class AuditSummary(BaseModel):
@@ -31,6 +33,9 @@ class AuditSummary(BaseModel):
     files_reviewed: int = 0
     dimensions_run: list[str] = Field(default_factory=list)
     dimension_summaries: list[DimensionSummary] = Field(default_factory=list)
+    avg_confidence: float = 0.0
+    high_confidence_count: int = 0   # findings with confidence > 0.8
+    low_confidence_count: int = 0    # findings with confidence < 0.5
 
     @classmethod
     def from_findings(
@@ -43,6 +48,11 @@ class AuditSummary(BaseModel):
         important = sum(1 for f in findings if f.severity == Severity.IMPORTANT)
         nit = sum(1 for f in findings if f.severity == Severity.NIT)
         pre_existing = sum(1 for f in findings if f.severity == Severity.PRE_EXISTING)
+        avg_confidence = (
+            sum(f.confidence for f in findings) / len(findings) if findings else 0.0
+        )
+        high_confidence_count = sum(1 for f in findings if f.confidence > 0.8)
+        low_confidence_count = sum(1 for f in findings if f.confidence < 0.5)
         return cls(
             total_findings=len(findings),
             important=important,
@@ -51,6 +61,9 @@ class AuditSummary(BaseModel):
             files_reviewed=files_reviewed,
             dimensions_run=dimensions,
             dimension_summaries=dimension_details or [],
+            avg_confidence=avg_confidence,
+            high_confidence_count=high_confidence_count,
+            low_confidence_count=low_confidence_count,
         )
 
 
@@ -67,6 +80,8 @@ class AuditReport(BaseModel):
     duration_seconds: float = 0.0
     review_rules_applied: bool = False
     llm_providers_used: list[str] = Field(default_factory=list)
+    usage: list[UsageRecord] = Field(default_factory=list)
+    total_cost_usd: float = 0.0
 
     @property
     def has_important_findings(self) -> bool:

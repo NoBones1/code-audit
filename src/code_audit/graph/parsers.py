@@ -331,6 +331,348 @@ def parse_typescript(file_path: str, source: str) -> tuple[list[CodeSymbol], lis
     return symbols, imports, complexity
 
 
+# ── Go Parser ─────────────────────────────────────────────────────
+
+
+def _get_go_parser() -> Parser:
+    import tree_sitter_go as tsgo
+    parser = Parser(Language(tsgo.language()))
+    return parser
+
+
+def parse_go(file_path: str, source: str) -> tuple[list[CodeSymbol], list[Dependency], int]:
+    """Parse a Go file and extract symbols and imports."""
+    parser = _get_go_parser()
+    source_bytes = source.encode("utf-8")
+    tree = parser.parse(source_bytes)
+
+    symbols: list[CodeSymbol] = []
+    imports: list[Dependency] = []
+    complexity = 0
+
+    def walk(node: Node):
+        nonlocal complexity
+
+        if node.type == "function_declaration":
+            name_node = _find_first_child(node, "identifier")
+            if name_node:
+                name = _node_text(name_node, source_bytes)
+                symbols.append(CodeSymbol(
+                    name=name,
+                    kind=SymbolKind.FUNCTION,
+                    file_path=file_path,
+                    start_line=node.start_point[0] + 1,
+                    end_line=node.end_point[0] + 1,
+                    signature=source.split("\n")[node.start_point[0]].strip()[:120],
+                    exported=name[0:1].isupper(),
+                ))
+
+        elif node.type == "method_declaration":
+            name_node = _find_first_child(node, "field_identifier")
+            if name_node:
+                name = _node_text(name_node, source_bytes)
+                symbols.append(CodeSymbol(
+                    name=name,
+                    kind=SymbolKind.METHOD,
+                    file_path=file_path,
+                    start_line=node.start_point[0] + 1,
+                    end_line=node.end_point[0] + 1,
+                    signature=source.split("\n")[node.start_point[0]].strip()[:120],
+                    exported=name[0:1].isupper(),
+                ))
+
+        elif node.type == "type_declaration":
+            for child in node.children:
+                if child.type == "type_spec":
+                    name_node = _find_first_child(child, "type_identifier")
+                    if name_node:
+                        name = _node_text(name_node, source_bytes)
+                        # Determine kind from the type body
+                        kind = SymbolKind.CLASS  # default
+                        if _find_first_child(child, "struct_type"):
+                            kind = SymbolKind.STRUCT
+                        elif _find_first_child(child, "interface_type"):
+                            kind = SymbolKind.INTERFACE
+                        symbols.append(CodeSymbol(
+                            name=name,
+                            kind=kind,
+                            file_path=file_path,
+                            start_line=child.start_point[0] + 1,
+                            end_line=child.end_point[0] + 1,
+                            signature=source.split("\n")[child.start_point[0]].strip()[:120],
+                            exported=name[0:1].isupper(),
+                        ))
+
+        elif node.type == "import_declaration":
+            for child in node.children:
+                if child.type == "import_spec":
+                    path_node = _find_first_child(child, "interpreted_string_literal")
+                    if path_node:
+                        import_path = _node_text(path_node, source_bytes).strip('"')
+                        imports.append(Dependency(
+                            source_file=file_path,
+                            target_file=import_path,
+                            target_symbol=import_path.split("/")[-1] if "/" in import_path else import_path,
+                            kind="import",
+                            line=child.start_point[0] + 1,
+                        ))
+                # Single import (no parens)
+                elif child.type == "interpreted_string_literal":
+                    import_path = _node_text(child, source_bytes).strip('"')
+                    imports.append(Dependency(
+                        source_file=file_path,
+                        target_file=import_path,
+                        target_symbol=import_path.split("/")[-1] if "/" in import_path else import_path,
+                        kind="import",
+                        line=child.start_point[0] + 1,
+                    ))
+
+        # Complexity
+        elif node.type in ("if_statement", "for_statement", "switch_statement", "select_statement"):
+            complexity += 1
+
+        for child in node.children:
+            walk(child)
+
+    walk(tree.root_node)
+    return symbols, imports, complexity
+
+
+# ── Rust Parser ───────────────────────────────────────────────────
+
+
+def _get_rust_parser() -> Parser:
+    import tree_sitter_rust as tsrust
+    parser = Parser(Language(tsrust.language()))
+    return parser
+
+
+def parse_rust(file_path: str, source: str) -> tuple[list[CodeSymbol], list[Dependency], int]:
+    """Parse a Rust file and extract symbols and imports."""
+    parser = _get_rust_parser()
+    source_bytes = source.encode("utf-8")
+    tree = parser.parse(source_bytes)
+
+    symbols: list[CodeSymbol] = []
+    imports: list[Dependency] = []
+    complexity = 0
+
+    def walk(node: Node):
+        nonlocal complexity
+
+        if node.type == "function_item":
+            name_node = _find_first_child(node, "identifier")
+            if name_node:
+                name = _node_text(name_node, source_bytes)
+                symbols.append(CodeSymbol(
+                    name=name,
+                    kind=SymbolKind.FUNCTION,
+                    file_path=file_path,
+                    start_line=node.start_point[0] + 1,
+                    end_line=node.end_point[0] + 1,
+                    signature=source.split("\n")[node.start_point[0]].strip()[:120],
+                    exported=any(
+                        c.type == "visibility_modifier" for c in (node.children or [])
+                    ),
+                ))
+
+        elif node.type == "struct_item":
+            name_node = _find_first_child(node, "type_identifier")
+            if name_node:
+                name = _node_text(name_node, source_bytes)
+                symbols.append(CodeSymbol(
+                    name=name,
+                    kind=SymbolKind.STRUCT,
+                    file_path=file_path,
+                    start_line=node.start_point[0] + 1,
+                    end_line=node.end_point[0] + 1,
+                    signature=source.split("\n")[node.start_point[0]].strip()[:120],
+                    exported=any(
+                        c.type == "visibility_modifier" for c in (node.children or [])
+                    ),
+                ))
+
+        elif node.type == "impl_item":
+            type_node = _find_first_child(node, "type_identifier")
+            if type_node:
+                name = _node_text(type_node, source_bytes)
+                symbols.append(CodeSymbol(
+                    name=name,
+                    kind=SymbolKind.IMPL,
+                    file_path=file_path,
+                    start_line=node.start_point[0] + 1,
+                    end_line=node.end_point[0] + 1,
+                    signature=source.split("\n")[node.start_point[0]].strip()[:120],
+                    exported=False,
+                ))
+
+        elif node.type == "enum_item":
+            name_node = _find_first_child(node, "type_identifier")
+            if name_node:
+                name = _node_text(name_node, source_bytes)
+                symbols.append(CodeSymbol(
+                    name=name,
+                    kind=SymbolKind.ENUM_TYPE,
+                    file_path=file_path,
+                    start_line=node.start_point[0] + 1,
+                    end_line=node.end_point[0] + 1,
+                    signature=source.split("\n")[node.start_point[0]].strip()[:120],
+                    exported=any(
+                        c.type == "visibility_modifier" for c in (node.children or [])
+                    ),
+                ))
+
+        elif node.type == "trait_item":
+            name_node = _find_first_child(node, "type_identifier")
+            if name_node:
+                name = _node_text(name_node, source_bytes)
+                symbols.append(CodeSymbol(
+                    name=name,
+                    kind=SymbolKind.TRAIT,
+                    file_path=file_path,
+                    start_line=node.start_point[0] + 1,
+                    end_line=node.end_point[0] + 1,
+                    signature=source.split("\n")[node.start_point[0]].strip()[:120],
+                    exported=any(
+                        c.type == "visibility_modifier" for c in (node.children or [])
+                    ),
+                ))
+
+        elif node.type == "use_declaration":
+            # Extract path segments from use declarations
+            text = _node_text(node, source_bytes)
+            # Remove "use " prefix and trailing ";"
+            path_text = text.lstrip("use ").rstrip(";").strip()
+            if path_text:
+                # Convert use path to a module path
+                base_path = path_text.split("{")[0].rstrip("::")
+                if base_path:
+                    imports.append(Dependency(
+                        source_file=file_path,
+                        target_file=base_path.replace("::", "/"),
+                        target_symbol=base_path.split("::")[-1],
+                        kind="import",
+                        line=node.start_point[0] + 1,
+                    ))
+
+        # Complexity
+        elif node.type in ("if_expression", "for_expression", "match_expression", "loop_expression"):
+            complexity += 1
+
+        for child in node.children:
+            walk(child)
+
+    walk(tree.root_node)
+    return symbols, imports, complexity
+
+
+# ── Java Parser ───────────────────────────────────────────────────
+
+
+def _get_java_parser() -> Parser:
+    import tree_sitter_java as tsjava
+    parser = Parser(Language(tsjava.language()))
+    return parser
+
+
+def parse_java(file_path: str, source: str) -> tuple[list[CodeSymbol], list[Dependency], int]:
+    """Parse a Java file and extract symbols and imports."""
+    parser = _get_java_parser()
+    source_bytes = source.encode("utf-8")
+    tree = parser.parse(source_bytes)
+
+    symbols: list[CodeSymbol] = []
+    imports: list[Dependency] = []
+    complexity = 0
+
+    def walk(node: Node, parent_class: str | None = None):
+        nonlocal complexity
+
+        if node.type == "class_declaration":
+            name_node = _find_first_child(node, "identifier")
+            if name_node:
+                class_name = _node_text(name_node, source_bytes)
+                # Check for public modifier
+                exported = any(
+                    c.type == "modifiers" and "public" in _node_text(c, source_bytes)
+                    for c in (node.children or [])
+                )
+                symbols.append(CodeSymbol(
+                    name=class_name,
+                    kind=SymbolKind.CLASS,
+                    file_path=file_path,
+                    start_line=node.start_point[0] + 1,
+                    end_line=node.end_point[0] + 1,
+                    signature=source.split("\n")[node.start_point[0]].strip()[:120],
+                    exported=exported,
+                    parent=parent_class,
+                ))
+                # Recurse into class body
+                body = _find_first_child(node, "class_body")
+                if body:
+                    for child in body.children:
+                        walk(child, parent_class=class_name)
+                return
+
+        elif node.type == "method_declaration":
+            name_node = _find_first_child(node, "identifier")
+            if name_node:
+                name = _node_text(name_node, source_bytes)
+                exported = any(
+                    c.type == "modifiers" and "public" in _node_text(c, source_bytes)
+                    for c in (node.children or [])
+                )
+                symbols.append(CodeSymbol(
+                    name=name,
+                    kind=SymbolKind.METHOD if parent_class else SymbolKind.FUNCTION,
+                    file_path=file_path,
+                    start_line=node.start_point[0] + 1,
+                    end_line=node.end_point[0] + 1,
+                    signature=source.split("\n")[node.start_point[0]].strip()[:120],
+                    exported=exported,
+                    parent=parent_class,
+                ))
+
+        elif node.type == "interface_declaration":
+            name_node = _find_first_child(node, "identifier")
+            if name_node:
+                name = _node_text(name_node, source_bytes)
+                symbols.append(CodeSymbol(
+                    name=name,
+                    kind=SymbolKind.INTERFACE,
+                    file_path=file_path,
+                    start_line=node.start_point[0] + 1,
+                    end_line=node.end_point[0] + 1,
+                    signature=source.split("\n")[node.start_point[0]].strip()[:120],
+                    exported=True,
+                    parent=parent_class,
+                ))
+
+        elif node.type == "import_declaration":
+            # import com.example.Foo;
+            scoped = _find_first_child(node, "scoped_identifier")
+            if scoped:
+                import_path = _node_text(scoped, source_bytes)
+                imports.append(Dependency(
+                    source_file=file_path,
+                    target_file=import_path.replace(".", "/") + ".java",
+                    target_symbol=import_path.split(".")[-1],
+                    kind="import",
+                    line=node.start_point[0] + 1,
+                ))
+
+        # Complexity
+        elif node.type in ("if_statement", "for_statement", "while_statement",
+                           "switch_expression", "try_statement"):
+            complexity += 1
+
+        for child in node.children:
+            walk(child, parent_class)
+
+    walk(tree.root_node)
+    return symbols, imports, complexity
+
+
 # ── Helpers ────────────────────────────────────────────────────────
 
 
@@ -374,6 +716,9 @@ LANGUAGE_PARSERS = {
     "TypeScript (TSX)": parse_typescript,
     "JavaScript": parse_typescript,  # Same parser handles JS
     "JavaScript (JSX)": parse_typescript,
+    "Go": parse_go,
+    "Rust": parse_rust,
+    "Java": parse_java,
 }
 
 

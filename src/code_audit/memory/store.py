@@ -60,6 +60,8 @@ class AuditSummaryRecord(BaseModel):
     nit: int
     pre_existing: int
     duration_seconds: float
+    total_cost_usd: float = 0.0
+    total_tokens: int = 0
     dimensions_run: list[str] = Field(default_factory=list)
 
 

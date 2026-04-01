@@ -48,6 +48,11 @@ class LLMProvider(abc.ABC):
         ...
 
     @property
+    def last_usage(self) -> dict[str, int]:
+        """Token usage from the most recent API call."""
+        return getattr(self, '_last_usage', {"input_tokens": 0, "output_tokens": 0})
+
+    @property
     @abc.abstractmethod
     def model_name(self) -> str:
         """Return the model identifier."""
