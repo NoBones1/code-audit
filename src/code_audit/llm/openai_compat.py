@@ -26,6 +26,8 @@ T = TypeVar("T", bound=BaseModel)
 class OpenAICompatProvider(LLMProvider):
     """Provider for any OpenAI-compatible API endpoint."""
 
+    DEFAULT_TIMEOUT_SECONDS = 300.0  # 5 min — large context LLM calls can be slow
+
     def __init__(
         self,
         model: str = "gpt-4o",
@@ -51,7 +53,7 @@ class OpenAICompatProvider(LLMProvider):
         temperature: float = 0.2,
         max_tokens: int = 8192,
     ) -> str:
-        async with httpx.AsyncClient(timeout=300.0) as client:
+        async with httpx.AsyncClient(timeout=self.DEFAULT_TIMEOUT_SECONDS) as client:
             headers = {"Content-Type": "application/json"}
             if self._api_key:
                 headers["Authorization"] = f"Bearer {self._api_key}"
@@ -96,7 +98,7 @@ class OpenAICompatProvider(LLMProvider):
             f"Do not include any text before or after the JSON."
         )
 
-        async with httpx.AsyncClient(timeout=300.0) as client:
+        async with httpx.AsyncClient(timeout=self.DEFAULT_TIMEOUT_SECONDS) as client:
             headers = {"Content-Type": "application/json"}
             if self._api_key:
                 headers["Authorization"] = f"Bearer {self._api_key}"

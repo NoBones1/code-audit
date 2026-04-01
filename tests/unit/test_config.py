@@ -30,7 +30,11 @@ class TestDefaultConfig:
         assert OutputFormat.SARIF in config.output.formats
 
     def test_load_config_no_file(self, tmp_path):
-        """Loading config from a dir with no config file returns defaults."""
+        """Loading config from a dir with no config file returns DEFAULT_CONFIG.
+
+        Note: AuditConfig() uses model defaults (NVIDIA), but load_config()
+        uses DEFAULT_CONFIG from defaults.py (Gemini paid as primary).
+        """
         config = load_config(project_path=tmp_path)
         assert config.review.mode == ReviewMode.DEEP
         assert config.llm.provider == LLMProvider.GEMINI

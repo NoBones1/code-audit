@@ -218,7 +218,11 @@ class SecretsScanner:
 
         return findings
 
-    # Paths that contain test fixtures with fake secrets — skip these
+    # Paths that contain test fixtures with fake secrets — skip these.
+    # Design decision: test files routinely contain intentional fake secrets
+    # (e.g., "AKIAIOSFODNN7EXAMPLE") for scanner testing. Flagging these creates
+    # noise that drowns out real findings. Users needing test-file scanning can
+    # subclass SecretsScanner and override _is_test_file().
     TEST_PATH_PATTERNS = frozenset({
         "test_", "tests/", "__tests__/", "fixtures/", "mock", "spec/",
     })
