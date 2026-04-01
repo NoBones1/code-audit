@@ -218,12 +218,25 @@ class SecretsScanner:
 
         return findings
 
+    # Paths that contain test fixtures with fake secrets — skip these
+    TEST_PATH_PATTERNS = frozenset({
+        "test_", "tests/", "__tests__/", "fixtures/", "mock", "spec/",
+    })
+
+    def _is_test_file(self, file_path: str) -> bool:
+        """Check if a file is a test/fixture file (likely contains fake secrets)."""
+        lower = file_path.lower()
+        return any(pattern in lower for pattern in self.TEST_PATH_PATTERNS)
+
     def scan_files(self, files: dict[str, str]) -> list[Finding]:
         """Scan multiple files for secrets."""
         all_findings: list[Finding] = []
         for file_path, content in files.items():
             # Skip binary-looking or very large files
             if len(content) > 500_000:
+                continue
+            # Skip test files (they contain intentional fake secrets for testing)
+            if self._is_test_file(file_path):
                 continue
             all_findings.extend(self.scan_file(file_path, content))
         return all_findings

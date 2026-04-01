@@ -16,10 +16,12 @@ MODEL_PRICING: dict[str, tuple[float, float, str]] = {
     "gemini-2.5-flash-lite": (0.0, 0.0, "Gemini free tier"),
     # OpenRouter free tier
     "meta-llama/llama-3.3-70b-instruct:free": (0.0, 0.0, "OpenRouter free tier"),
-    # Claude (paid)
+    # Claude (paid — direct Anthropic)
     "claude-sonnet-4-6": (3.0, 15.0, "per 1M tokens"),
     "claude-opus-4-6": (15.0, 75.0, "per 1M tokens"),
     "claude-haiku-4-5": (0.80, 4.0, "per 1M tokens"),
+    # Claude via Venice.ai (DIEM credits)
+    "claude-sonnet-4.6": (3.6, 18.0, "Venice.ai DIEM credits"),
     # Gemini paid
     "gemini-2.5-pro": (1.25, 10.0, "per 1M tokens"),
 }

@@ -11,7 +11,7 @@ from pathlib import Path
 import yaml
 from pydantic import ValidationError
 
-from code_audit.config.defaults import CONFIG_FILE_NAMES, GLOBAL_CONFIG_DIR, GLOBAL_CONFIG_FILE
+from code_audit.config.defaults import CONFIG_FILE_NAMES, DEFAULT_CONFIG, GLOBAL_CONFIG_DIR, GLOBAL_CONFIG_FILE
 from code_audit.config.models import AuditConfig, ReviewMode
 
 
@@ -98,14 +98,22 @@ def load_config(
         merged.setdefault("review", {})["diff_target"] = diff_target
 
     # 4. Parse into validated config
-    try:
-        config = AuditConfig(**merged)
-    except ValidationError:
-        # Fall back to defaults if config is malformed
-        config = AuditConfig()
-        if mode:
-            config.review.mode = mode
-        if diff_target:
-            config.review.diff_target = diff_target
+    if merged:
+        # Merge user config on top of defaults
+        base = DEFAULT_CONFIG.model_dump()
+        merged = deep_merge(base, merged)
+        try:
+            config = AuditConfig(**merged)
+        except ValidationError:
+            config = DEFAULT_CONFIG.model_copy()
+    else:
+        # No config files found — use defaults (includes fallback chain)
+        config = DEFAULT_CONFIG.model_copy()
+
+    # Apply CLI overrides
+    if mode:
+        config.review.mode = mode
+    if diff_target:
+        config.review.diff_target = diff_target
 
     return config

@@ -51,7 +51,7 @@ class OpenAICompatProvider(LLMProvider):
         temperature: float = 0.2,
         max_tokens: int = 8192,
     ) -> str:
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=300.0) as client:
             headers = {"Content-Type": "application/json"}
             if self._api_key:
                 headers["Authorization"] = f"Bearer {self._api_key}"
@@ -96,7 +96,7 @@ class OpenAICompatProvider(LLMProvider):
             f"Do not include any text before or after the JSON."
         )
 
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=300.0) as client:
             headers = {"Content-Type": "application/json"}
             if self._api_key:
                 headers["Authorization"] = f"Bearer {self._api_key}"

@@ -2,8 +2,8 @@
 
 from code_audit.config.models import AuditConfig, LLMConfig, LLMProvider
 
-# Default provider chain: NVIDIA → Gemini → OpenRouter
-# All free-tier, no cost. Kimi K2.5 chosen for best code reasoning (SWE-Bench #2).
+# Default provider chain: NVIDIA → Venice (Sonnet) → Gemini → OpenRouter
+# NVIDIA and Gemini are free tier. Venice uses DIEM credits.
 DEFAULT_CONFIG = AuditConfig(
     llm=LLMConfig(
         provider=LLMProvider.NVIDIA,
@@ -11,14 +11,26 @@ DEFAULT_CONFIG = AuditConfig(
         api_key_env="NVIDIA_API_KEY",
         fallbacks=[
             LLMConfig(
+                provider=LLMProvider.OPENAI_COMPAT,
+                model="claude-sonnet-4-6",
+                api_key_env="VENICE_API_KEY",
+                base_url="https://api.venice.ai/api/v1",
+            ),
+            LLMConfig(
                 provider=LLMProvider.GEMINI,
                 model="gemini-2.5-flash",
                 api_key_env="GEMINI_API_KEY",
             ),
             LLMConfig(
                 provider=LLMProvider.OPENAI_COMPAT,
-                model="meta-llama/llama-3.3-70b-instruct:free",
+                model="qwen/qwen3-next-80b-a3b-instruct:free",
                 api_key_env="OPENROUTER_API_KEY_PAID",
+                base_url="https://openrouter.ai/api/v1",
+            ),
+            LLMConfig(
+                provider=LLMProvider.OPENAI_COMPAT,
+                model="google/gemma-3-27b-it:free",
+                api_key_env="OPENROUTER_API_KEY",
                 base_url="https://openrouter.ai/api/v1",
             ),
         ],
