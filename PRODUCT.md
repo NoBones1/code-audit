@@ -1,7 +1,7 @@
 # CodeAudit: Product Overview & Competitive Analysis
 
 **Last updated**: 2026-04-01
-**Status**: Phase 2 complete, Phase 3 in planning
+**Status**: Phase 3 complete
 **Repos**: [NoBones1/code-audit](https://github.com/NoBones1/code-audit) | [NoBones1/prompt-builder](https://github.com/NoBones1/prompt-builder)
 
 ---
@@ -46,21 +46,16 @@ Multi-agent AI code review tool that spawns 5 specialist agents in parallel (sec
 | Webhook server | FastAPI server for GitHub event handling | ✅ Built |
 | Persistent memory | Learns team preferences, suppresses dismissed findings | ✅ Built |
 | VS Code extension | Sidebar panel, inline diagnostics, dismiss action | ✅ Packaged (.vsix) |
-| 119 unit tests | Diff parsing, config, memory, SARIF, agent response | ✅ All passing |
+| Cost tracking per review | Token counts + $ breakdown per agent, free/paid distinction | ✅ Live |
+| Secrets & credential scan | Regex pre-pass: AWS keys, GitHub tokens, passwords, entropy | ✅ Live |
+| Dependency vulnerability scan | npm audit, pip-audit, osv-scanner integration (SCA) | ✅ Live |
+| Tree-sitter Go/Rust/Java | Expand dependency analysis to 6 languages | ✅ Live |
+| REVIEW.md template generator | Smart, framework-aware template on `code-audit init` | ✅ Live |
+| Confidence stats display | Average confidence, high/low counts in reports | ✅ Live |
+| Agent self-reflection loop | Cross-agent reflection to reduce false positives | ✅ Live |
+| 192 unit tests | Diff parsing, config, memory, SARIF, agent response, Phase 3 features | ✅ All passing |
 | Project config system | YAML/JSON with per-project and global config | ✅ Live |
 | `code-audit init` | Generates starter config file | ✅ Live |
-
-### Planned (Phase 3)
-
-| Feature | Description | Priority |
-|---------|-------------|----------|
-| Cost tracking per review | Token counts + $ breakdown per agent, free/paid distinction | Build next |
-| Secrets & credential scan | Regex pre-pass: AWS keys, GitHub tokens, passwords, entropy | Build next |
-| Dependency vulnerability scan | npm audit, pip-audit, osv-scanner integration (SCA) | Build next |
-| Tree-sitter Go/Rust/Java | Expand dependency analysis to 6 languages | Build next |
-| REVIEW.md template generator | Smart, framework-aware template on `code-audit init` | Build next |
-| Confidence stats display | Average confidence, high/low counts in reports | Build next |
-| Agent self-reflection loop | Cross-agent reflection to reduce false positives | Build next |
 
 ### Future (Phase 4+)
 
@@ -81,7 +76,7 @@ Multi-agent AI code review tool that spawns 5 specialist agents in parallel (sec
 
 | Tool | Pricing | Multi-Agent | SARIF | PR Comments | Secrets | SCA | Memory | IDE |
 |------|---------|-------------|-------|-------------|---------|-----|--------|-----|
-| **CodeAudit (us)** | $0 (free tier) | ✅ 5 agents + judge | ✅ | ✅ | 🔜 Phase 3 | 🔜 Phase 3 | ✅ | ✅ VS Code |
+| **CodeAudit (us)** | $0 (free tier) | ✅ 5 agents + judge | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ VS Code |
 | **Claude Code Review** | ~$15-25/review | ✅ Multi-pass | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ |
 | **CodeRabbit** | $24/dev/month | ❌ Single-agent | ❌ | ✅ | ✅ | ✅ (Snyk) | ❌ | ❌ |
 | **Qodo (CodiumAI)** | $19/dev/month | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ JetBrains |
@@ -103,17 +98,13 @@ Multi-agent AI code review tool that spawns 5 specialist agents in parallel (sec
 
 | Gap | Competitor | Our Status | Phase |
 |-----|-----------|------------|-------|
-| Secrets scanning | CodeRabbit, Snyk, SonarQube | Building Phase 3 | 🔜 |
-| Dependency CVE scanning | CodeRabbit (Snyk), Snyk Code | Building Phase 3 | 🔜 |
-| Cost visibility | None (unique to us) | Building Phase 3 | 🔜 |
-| Go/Rust/Java tree-sitter | N/A | Building Phase 3 | 🔜 |
 | Auto-fix verification | Qodo (test generation) | Phase 4 | 📋 |
 | Web dashboard | SonarQube, Snyk | Phase 4 | 📋 |
 | SOC2/compliance mapping | Snyk, Veracode | Phase 4+ | 📋 |
 
-### After Phase 3 Completion
+### Post-Phase 3 Position
 
-With Phase 3 features built, CodeAudit will have **feature parity or superiority** vs every competitor except:
+With Phase 3 complete, CodeAudit has **feature parity or superiority** vs every competitor except:
 - Snyk's deep SCA database (their core competency — we use their free tools as inputs)
 - SonarQube's 5000+ static analysis rules (rule-based, not AI)
 - Veracode's compliance certification mappings (enterprise niche)
@@ -128,12 +119,12 @@ User -> Claude Code Plugin (/code-audit)  -> Agent tool (Max plan, $0)
      -> GitHub webhook (PR events)        -> CLI under the hood
 
 Pipeline:
-Phase 0:    Secrets Scan          (regex, $0.00)            [Phase 3]
-Phase 0.5:  Dependency Scan       (npm audit etc, $0.00)    [Phase 3]
+Phase 0:    Secrets Scan          (regex, $0.00)
+Phase 0.5:  Dependency Scan       (npm audit etc, $0.00)
 Phase 1:    Context Gathering     (git, tree-sitter, REVIEW.md)
 Phase 2:    5 Specialist Agents   (parallel, LLM)
 Phase 3:    Judge Aggregation     (dedup, filter, rank)
-Phase 3.5:  Reflection Loop       (cross-agent, 1 round)    [Phase 3]
+Phase 3.5:  Reflection Loop       (cross-agent, 1 round)
 Phase 4:    Output                (terminal + markdown + SARIF + cost)
 ```
 
@@ -173,13 +164,13 @@ Competitive pricing model: $9/dev/month (vs $24 CodeRabbit, $25 Snyk)
 | LLM Fallback | Gemini 2.5 Flash, OpenRouter |
 | Structured Output | Claude: output_config, Gemini: response_json_schema, OpenAI: response_format |
 | SARIF | sarif-pydantic |
-| AST Analysis | tree-sitter (Python, TypeScript, JavaScript + Go/Rust/Java planned) |
+| AST Analysis | tree-sitter (Python, TypeScript, JavaScript, Go, Rust, Java) |
 | Config | YAML/JSON |
 | State | File-based (.audit/ directory) |
 | VS Code | TypeScript extension |
 | GitHub | REST API (Octokit pattern), FastAPI webhook |
 | Package Manager | uv |
-| Tests | pytest (119 tests) |
+| Tests | pytest (192 tests) |
 
 ---
 
@@ -187,6 +178,7 @@ Competitive pricing model: $9/dev/month (vs $24 CodeRabbit, $25 Snyk)
 
 | Hash | Description |
 |------|-------------|
+| `phase3`  | Phase 3: cost tracking, secrets scan, SCA, tree-sitter 6 langs, reflection loop |
 | `702a0ff` | Switch default model to Kimi K2.5 |
 | `47162b7` | NVIDIA primary provider + fallback chain + 119 unit tests |
 | `26bd3c8` | Package VS Code extension as .vsix |
