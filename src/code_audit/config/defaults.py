@@ -2,14 +2,26 @@
 
 from code_audit.config.models import AuditConfig, LLMConfig, LLMProvider
 
-# Default provider chain: NVIDIA → Venice (Sonnet) → Gemini → OpenRouter
-# NVIDIA and Gemini are free tier. Venice uses DIEM credits.
+# Default provider chain: Gemini Paid → NVIDIA → Venice → Gemini Free → OpenRouter
+#
+# Priority logic:
+#   1. Gemini 2.5 Flash (paid) — cheapest at ~$0.08/review, high rate limits, reliable
+#   2. NVIDIA Kimi K2.5 — free but disconnects on large contexts (>50K tokens)
+#   3. Venice Sonnet — Claude-quality but $1.78/day DIEM budget (~1 deep review/day)
+#   4. Gemini 2.5 Flash (free) — 1,400 RPD limit, good for ~4-5 reviews/day
+#   5. OpenRouter Qwen3 — free model, paid key (1,000 RPD)
+#   6. OpenRouter Gemma 3 — free model, free key (50 RPD)
 DEFAULT_CONFIG = AuditConfig(
     llm=LLMConfig(
-        provider=LLMProvider.NVIDIA,
-        model="moonshotai/kimi-k2.5",
-        api_key_env="NVIDIA_API_KEY",
+        provider=LLMProvider.GEMINI,
+        model="gemini-2.5-flash",
+        api_key_env="GEMINI_API_KEY_2",
         fallbacks=[
+            LLMConfig(
+                provider=LLMProvider.NVIDIA,
+                model="moonshotai/kimi-k2.5",
+                api_key_env="NVIDIA_API_KEY",
+            ),
             LLMConfig(
                 provider=LLMProvider.OPENAI_COMPAT,
                 model="claude-sonnet-4-6",

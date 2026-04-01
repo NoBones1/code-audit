@@ -22,7 +22,7 @@ from code_audit.config.models import (
 class TestDefaultConfig:
     def test_default_config_loads(self):
         config = AuditConfig()
-        assert config.llm.provider == LLMProvider.NVIDIA
+        assert config.llm.provider == LLMProvider.NVIDIA  # bare model default
         assert config.review.mode == ReviewMode.DEEP
         assert config.review.diff_target == "HEAD"
         assert config.review.include == ["**/*"]
@@ -33,7 +33,7 @@ class TestDefaultConfig:
         """Loading config from a dir with no config file returns defaults."""
         config = load_config(project_path=tmp_path)
         assert config.review.mode == ReviewMode.DEEP
-        assert config.llm.provider == LLMProvider.NVIDIA
+        assert config.llm.provider == LLMProvider.GEMINI
 
     def test_load_config_with_mode_override(self, tmp_path):
         config = load_config(project_path=tmp_path, mode=ReviewMode.QUICK)
