@@ -6,6 +6,7 @@ if the primary fails (network error, auth error, rate limit).
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import TypeVar
 
@@ -89,6 +90,7 @@ class FallbackProvider(LLMProvider):
                 logger.warning(
                     f"Provider {provider.provider_name}/{provider.model_name} failed: {e}"
                 )
+                await asyncio.sleep(1.0)  # brief pause before trying next provider
                 continue
 
         raise RuntimeError(
@@ -128,6 +130,7 @@ class FallbackProvider(LLMProvider):
                 logger.warning(
                     f"Provider {provider.provider_name}/{provider.model_name} failed: {e}"
                 )
+                await asyncio.sleep(1.0)  # brief pause before trying next provider
                 continue
 
         raise RuntimeError(

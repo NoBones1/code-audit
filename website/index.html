@@ -186,6 +186,59 @@
       padding: 2px 8px; border-radius: 4px; border: 1px solid; letter-spacing: 0.04em;
     }
 
+    /* ── ENGINE / POWERED BY ── */
+    .engine-bg {
+      background: linear-gradient(180deg, transparent 0%, rgba(0,245,212,0.02) 50%, transparent 100%);
+      border-top: 1px solid var(--bord); border-bottom: 1px solid var(--bord);
+      margin: 0; padding: 8rem 1.5rem;
+    }
+    .engine-inner { max-width: 1100px; margin: 0 auto; }
+    .engine-rows { display: flex; flex-direction: column; gap: 10px; margin-bottom: 2rem; }
+    .engine-row {
+      display: grid; grid-template-columns: 1fr 3px 1fr; align-items: center; gap: 0;
+      background: var(--surf); border: 1px solid var(--bord); border-radius: 14px;
+      overflow: hidden; transition: border-color 0.3s, transform 0.3s;
+    }
+    .engine-row:hover { border-color: rgba(0,245,212,0.2); transform: translateX(4px); }
+    .engine-row.judge-row { border-color: rgba(255,184,0,0.2); background: rgba(255,184,0,0.03); }
+    .engine-row.judge-row:hover { border-color: rgba(255,184,0,0.4); }
+    .engine-agent { padding: 1.2rem 1.6rem; display: flex; align-items: center; gap: 14px; }
+    .engine-agent-icon { font-size: 1.5rem; flex-shrink: 0; }
+    .engine-agent-name { font-family: var(--fD); font-size: 0.95rem; font-weight: 700; }
+    .engine-agent-role { font-size: 0.75rem; color: var(--txt2); margin-top: 2px; }
+    .engine-divider { width: 3px; align-self: stretch; background: var(--bord); }
+    .engine-model-block { padding: 1.2rem 1.6rem; display: flex; flex-direction: column; gap: 6px; }
+    .engine-primary { display: flex; align-items: center; gap: 10px; }
+    .engine-model-name { font-family: var(--fM); font-size: 0.82rem; color: #fff; }
+    .engine-provider-badge {
+      font-size: 0.65rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
+      padding: 2px 8px; border-radius: 5px; border: 1px solid; flex-shrink: 0;
+    }
+    .badge-google { color: #4285F4; border-color: rgba(66,133,244,0.3); background: rgba(66,133,244,0.08); }
+    .badge-nvidia { color: #76B900; border-color: rgba(118,185,0,0.3); background: rgba(118,185,0,0.08); }
+    .badge-openrouter { color: #8B5CF6; border-color: rgba(139,92,246,0.3); background: rgba(139,92,246,0.08); }
+    .badge-ollama { color: #00F5D4; border-color: rgba(0,245,212,0.3); background: rgba(0,245,212,0.08); }
+    .engine-fallback-tags { display: flex; gap: 5px; flex-wrap: wrap; }
+    .engine-fb-tag {
+      font-size: 0.62rem; font-family: var(--fM); color: var(--txt2);
+      padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.06);
+      background: rgba(255,255,255,0.03);
+    }
+    .engine-cost-tag { font-family: var(--fM); font-size: 0.7rem; color: #30D158; }
+    .fallback-rail-wrap {
+      background: var(--surf); border: 1px solid var(--bord); border-radius: 14px;
+      padding: 1.2rem 1.8rem; display: flex; align-items: center; gap: 8px;
+      overflow-x: auto; flex-wrap: nowrap;
+    }
+    .rail-head { font-size: 0.72rem; color: var(--txt2); font-family: var(--fM); white-space: nowrap; margin-right: 4px; }
+    .rail-pill {
+      font-size: 0.7rem; font-family: var(--fM); padding: 3px 10px; border-radius: 100px;
+      border: 1px solid rgba(0,245,212,0.2); color: var(--teal); background: rgba(0,245,212,0.05);
+      white-space: nowrap; opacity: 0; transform: translateX(-8px); flex-shrink: 0;
+    }
+    .rail-arrow { color: var(--txt2); font-size: 0.75rem; opacity: 0; flex-shrink: 0; }
+    .rail-final { font-size: 0.7rem; font-family: var(--fM); color: #30D158; white-space: nowrap; opacity: 0; flex-shrink: 0; }
+
     /* ── FEATURES TABS ── */
     .feat-tabs { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-bottom: 3rem; }
     .feat-tab {
@@ -400,6 +453,161 @@
     </span>
   </div>
 </section>
+
+<!-- ENGINE / POWERED BY -->
+<div class="engine-bg" id="engine">
+  <div class="engine-inner">
+    <div class="section-label">Under the Hood</div>
+    <h2 class="section-title">Transparent by design.</h2>
+    <p class="section-sub">Every agent's primary model and full fallback chain — visible to you. No black boxes. No vendor lock-in.</p>
+
+    <div class="engine-rows" id="engine-rows">
+      <!-- Security -->
+      <div class="engine-row" style="--row-color:#FF3366">
+        <div class="engine-agent">
+          <div class="engine-agent-icon">🔒</div>
+          <div><div class="engine-agent-name" style="color:#FF3366">Security</div><div class="engine-agent-role">OWASP · Injections · Auth · Crypto</div></div>
+        </div>
+        <div class="engine-divider"></div>
+        <div class="engine-model-block">
+          <div class="engine-primary">
+            <span class="engine-model-name">gemini-2.5-flash</span>
+            <span class="engine-provider-badge badge-google">Google</span>
+            <span class="engine-cost-tag">$0.00</span>
+          </div>
+          <div class="engine-fallback-tags">
+            <span class="engine-fb-tag">↓ kimi-k2.5 · NVIDIA</span>
+            <span class="engine-fb-tag">↓ devstral · Ollama Cloud</span>
+            <span class="engine-fb-tag">↓ gemini-2.5-flash free</span>
+            <span class="engine-fb-tag">↓ qwen3-next-80b · OpenRouter</span>
+          </div>
+        </div>
+      </div>
+      <!-- Architecture -->
+      <div class="engine-row" style="--row-color:#00F5D4">
+        <div class="engine-agent">
+          <div class="engine-agent-icon">🏗️</div>
+          <div><div class="engine-agent-name" style="color:#00F5D4">Architecture</div><div class="engine-agent-role">SOLID · Coupling · Scalability</div></div>
+        </div>
+        <div class="engine-divider"></div>
+        <div class="engine-model-block">
+          <div class="engine-primary">
+            <span class="engine-model-name">gemini-2.5-flash</span>
+            <span class="engine-provider-badge badge-google">Google</span>
+            <span class="engine-cost-tag">$0.00</span>
+          </div>
+          <div class="engine-fallback-tags">
+            <span class="engine-fb-tag">↓ kimi-k2.5 · NVIDIA</span>
+            <span class="engine-fb-tag">↓ devstral · Ollama Cloud</span>
+            <span class="engine-fb-tag">↓ gemini-2.5-flash free</span>
+            <span class="engine-fb-tag">↓ qwen3-next-80b · OpenRouter</span>
+          </div>
+        </div>
+      </div>
+      <!-- Performance -->
+      <div class="engine-row" style="--row-color:#FFB800">
+        <div class="engine-agent">
+          <div class="engine-agent-icon">⚡</div>
+          <div><div class="engine-agent-name" style="color:#FFB800">Performance</div><div class="engine-agent-role">N+1 · Complexity · Memory Leaks</div></div>
+        </div>
+        <div class="engine-divider"></div>
+        <div class="engine-model-block">
+          <div class="engine-primary">
+            <span class="engine-model-name">gemini-2.5-flash</span>
+            <span class="engine-provider-badge badge-google">Google</span>
+            <span class="engine-cost-tag">$0.00</span>
+          </div>
+          <div class="engine-fallback-tags">
+            <span class="engine-fb-tag">↓ kimi-k2.5 · NVIDIA</span>
+            <span class="engine-fb-tag">↓ devstral · Ollama Cloud</span>
+            <span class="engine-fb-tag">↓ gemini-2.5-flash free</span>
+            <span class="engine-fb-tag">↓ qwen3-next-80b · OpenRouter</span>
+          </div>
+        </div>
+      </div>
+      <!-- Functional -->
+      <div class="engine-row" style="--row-color:#8B5CF6">
+        <div class="engine-agent">
+          <div class="engine-agent-icon">✅</div>
+          <div><div class="engine-agent-name" style="color:#8B5CF6">Functional</div><div class="engine-agent-role">Logic Bugs · Edge Cases · Races</div></div>
+        </div>
+        <div class="engine-divider"></div>
+        <div class="engine-model-block">
+          <div class="engine-primary">
+            <span class="engine-model-name">qwen3-next-80b</span>
+            <span class="engine-provider-badge badge-openrouter">OpenRouter</span>
+            <span class="engine-cost-tag">$0.00</span>
+          </div>
+          <div class="engine-fallback-tags">
+            <span class="engine-fb-tag">↓ gemini-2.5-flash · Google</span>
+            <span class="engine-fb-tag">↓ kimi-k2.5 · NVIDIA</span>
+            <span class="engine-fb-tag">↓ devstral · Ollama Cloud</span>
+            <span class="engine-fb-tag">↓ gemma-3-27b free</span>
+          </div>
+        </div>
+      </div>
+      <!-- Maintainability -->
+      <div class="engine-row" style="--row-color:#30D158">
+        <div class="engine-agent">
+          <div class="engine-agent-icon">📐</div>
+          <div><div class="engine-agent-name" style="color:#30D158">Maintainability</div><div class="engine-agent-role">Readability · Complexity · Naming</div></div>
+        </div>
+        <div class="engine-divider"></div>
+        <div class="engine-model-block">
+          <div class="engine-primary">
+            <span class="engine-model-name">qwen3-next-80b</span>
+            <span class="engine-provider-badge badge-openrouter">OpenRouter</span>
+            <span class="engine-cost-tag">$0.00</span>
+          </div>
+          <div class="engine-fallback-tags">
+            <span class="engine-fb-tag">↓ gemini-2.5-flash · Google</span>
+            <span class="engine-fb-tag">↓ kimi-k2.5 · NVIDIA</span>
+            <span class="engine-fb-tag">↓ devstral · Ollama Cloud</span>
+            <span class="engine-fb-tag">↓ gemma-3-27b free</span>
+          </div>
+        </div>
+      </div>
+      <!-- Judge -->
+      <div class="engine-row judge-row">
+        <div class="engine-agent">
+          <div class="engine-agent-icon">⚖️</div>
+          <div><div class="engine-agent-name" style="color:#FFB800">Judge</div><div class="engine-agent-role">Deduplication · Ranking · Cross-reference</div></div>
+        </div>
+        <div class="engine-divider" style="background:rgba(255,184,0,0.2)"></div>
+        <div class="engine-model-block">
+          <div class="engine-primary">
+            <span class="engine-model-name">moonshotai/kimi-k2.5</span>
+            <span class="engine-provider-badge badge-nvidia">NVIDIA</span>
+            <span class="engine-cost-tag">$0.00</span>
+          </div>
+          <div class="engine-fallback-tags">
+            <span class="engine-fb-tag">↓ gemini-2.5-flash · Google</span>
+            <span class="engine-fb-tag">↓ qwen3-coder · Ollama Cloud</span>
+            <span class="engine-fb-tag">↓ qwen3-next-80b · OpenRouter</span>
+            <span class="engine-fb-tag">↓ gemma-3-27b free</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Fallback rail -->
+    <div class="fallback-rail-wrap" id="fallback-rail">
+      <span class="rail-head">Global fallback order →</span>
+      <span class="rail-pill" id="rp1">Gemini Paid</span>
+      <span class="rail-arrow" id="ra1">→</span>
+      <span class="rail-pill" id="rp2">NVIDIA Kimi</span>
+      <span class="rail-arrow" id="ra2">→</span>
+      <span class="rail-pill" id="rp3">Ollama Cloud</span>
+      <span class="rail-arrow" id="ra3">→</span>
+      <span class="rail-pill" id="rp4">Gemini Free</span>
+      <span class="rail-arrow" id="ra4">→</span>
+      <span class="rail-pill" id="rp5">OpenRouter Qwen</span>
+      <span class="rail-arrow" id="ra5">→</span>
+      <span class="rail-pill" id="rp6">OpenRouter Gemma</span>
+      <span class="rail-final" id="rfinal">✓ Always resolves</span>
+    </div>
+  </div>
+</div>
 
 <!-- FEATURES -->
 <section class="section" id="features">
@@ -663,6 +871,20 @@ gsap.from('.step-card',{opacity:0,y:40,stagger:0.15,duration:0.7,ease:'power2.ou
 
 // Agents stagger
 gsap.from('.agent-card',{opacity:0,y:30,scale:0.95,stagger:0.08,duration:0.6,ease:'power2.out',scrollTrigger:{trigger:'.agents-grid',start:'top 80%'}});
+
+// Engine rows — slide in from left with stagger
+gsap.from('.engine-row',{opacity:0,x:-30,stagger:0.1,duration:0.55,ease:'power2.out',scrollTrigger:{trigger:'#engine-rows',start:'top 80%'}});
+
+// Engine provider badges — glow in after rows land
+gsap.from('.engine-provider-badge',{opacity:0,scale:0.7,stagger:0.08,duration:0.4,delay:0.4,ease:'back.out(1.7)',scrollTrigger:{trigger:'#engine-rows',start:'top 80%'}});
+
+// Fallback rail — pills draw in left to right like signal propagation
+ScrollTrigger.create({trigger:'#fallback-rail',start:'top 85%',once:true,onEnter:()=>{
+  const seq = ['rp1','ra1','rp2','ra2','rp3','ra3','rp4','ra4','rp5','ra5','rp6','rfinal'];
+  seq.forEach((id,i)=>{
+    gsap.to('#'+id,{opacity:1,x:0,duration:0.3,delay:i*0.08,ease:'power2.out'});
+  });
+}});
 
 // Section labels
 document.querySelectorAll('.section-label, .section-title, .section-sub').forEach(el=>{

@@ -427,7 +427,8 @@ class Orchestrator:
         context: ReviewContext,
         agents: dict[str, type[BaseReviewAgent]],
     ) -> tuple[list[Finding], list[DimensionSummary]]:
-        """Run multiple agents in parallel via asyncio.gather."""
+        """Run agents with a concurrency cap to avoid rate-limit cascades on free providers."""
+        semaphore = asyncio.Semaphore(self.config.review.max_concurrency)
         tasks = []
         agent_names = []
 
@@ -442,7 +443,12 @@ class Orchestrator:
 
             memory_ctx = self.memory.format_for_prompt() or None
             agent = agent_cls(llm=provider, extra_instructions=extra, memory_context=memory_ctx)
-            tasks.append(self._run_single_agent(name, agent, context, provider=provider))
+
+            async def _gated(n=name, a=agent, p=provider):
+                async with semaphore:
+                    return await self._run_single_agent(n, a, context, provider=p)
+
+            tasks.append(_gated())
             agent_names.append(name)
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -535,7 +541,15 @@ class Orchestrator:
         if not tasks:
             return judged_findings
 
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        semaphore = asyncio.Semaphore(self.config.review.max_concurrency)
+        gated_tasks = []
+        for task_coro, (dim, provider) in zip(tasks, dimensions):
+            async def _gated_reflect(coro=task_coro):
+                async with semaphore:
+                    return await coro
+            gated_tasks.append(_gated_reflect())
+
+        results = await asyncio.gather(*gated_tasks, return_exceptions=True)
 
         # Collect updated findings
         reflected_findings: list[Finding] = []

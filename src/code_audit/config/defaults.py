@@ -24,11 +24,20 @@ _GEMINI_FREE = LLMConfig(
     api_key_env="GEMINI_API_KEY",
 )
 
-_VENICE_SONNET = LLMConfig(
+# Ollama Cloud — hosted LLMs via api.ollama.com (OpenAI-compatible)
+# Two keys for load distribution across two accounts
+_OLLAMA_DEVSTRAL = LLMConfig(
     provider=LLMProvider.OPENAI_COMPAT,
-    model="claude-sonnet-4-6",
-    api_key_env="VENICE_API_KEY",
-    base_url="https://api.venice.ai/api/v1",
+    model="devstral",                        # 123B code-specialist
+    api_key_env="OLLAMA_API_KEY",
+    base_url="https://api.ollama.com/v1",
+)
+
+_OLLAMA_QWEN_CODER = LLMConfig(
+    provider=LLMProvider.OPENAI_COMPAT,
+    model="qwen3-coder",                     # Agentic coding model
+    api_key_env="OLLAMA_API_KEY_2",
+    base_url="https://api.ollama.com/v1",
 )
 
 _OPENROUTER_QWEN = LLMConfig(
@@ -55,25 +64,44 @@ _OPENROUTER_GEMMA = LLMConfig(
 #
 # Specialist Agents: Gemini paid + OpenRouter (distributed)
 #   → process full codebase (~80-90K tokens each)
-#   → 5 agents running in parallel → spread across providers
-#   → Gemini handles 3 agents, OpenRouter handles 2
+#   → max 2 agents run concurrently (see ReviewConfig.max_concurrency)
+#   → prevents rate-limit cascade on free providers
 #
-# Fallback: every config has fallbacks so nothing fails hard
+# Fallback chain (6 deep, no paid Claude models):
+#   Gemini paid → Kimi/Ollama → Gemini free → OpenRouter → Gemma
 # ═══════════════════════════════════════════════════════════════
 
-# Default LLM (used by agents without an override)
+# Default LLM — security, architectural, performance agents (large context needed)
 _DEFAULT_LLM = _GEMINI_PAID.model_copy(update={
-    "fallbacks": [_NVIDIA_KIMI, _VENICE_SONNET, _GEMINI_FREE, _OPENROUTER_QWEN, _OPENROUTER_GEMMA],
+    "fallbacks": [
+        _NVIDIA_KIMI,
+        _OLLAMA_DEVSTRAL,
+        _GEMINI_FREE,
+        _OPENROUTER_QWEN,
+        _OPENROUTER_GEMMA,
+    ],
 })
 
-# Judge gets the strongest model (Kimi) — it only sees findings, not full code
+# Judge LLM — strongest reasoning model first; only sees findings (~2-5K tokens)
 _JUDGE_LLM = _NVIDIA_KIMI.model_copy(update={
-    "fallbacks": [_VENICE_SONNET, _GEMINI_PAID, _GEMINI_FREE],
+    "fallbacks": [
+        _GEMINI_PAID,
+        _OLLAMA_QWEN_CODER,
+        _GEMINI_FREE,
+        _OPENROUTER_QWEN,
+        _OPENROUTER_GEMMA,
+    ],
 })
 
-# Split specialist agents across Gemini and OpenRouter to avoid rate limits
+# OpenRouter agent LLM — functional, maintainability agents
 _OPENROUTER_AGENT_LLM = _OPENROUTER_QWEN.model_copy(update={
-    "fallbacks": [_GEMINI_PAID, _OPENROUTER_GEMMA, _GEMINI_FREE],
+    "fallbacks": [
+        _GEMINI_PAID,
+        _NVIDIA_KIMI,
+        _OLLAMA_DEVSTRAL,
+        _OPENROUTER_GEMMA,
+        _GEMINI_FREE,
+    ],
 })
 
 DEFAULT_CONFIG = AuditConfig(
@@ -88,12 +116,6 @@ DEFAULT_CONFIG = AuditConfig(
 
         # Judge: Kimi K2.5 — strongest reasoning, small input (findings only)
         "judge": AgentConfig(llm=_JUDGE_LLM),
-
-        # Reflection agents also use Kimi (same reasoning-heavy task)
-        # Note: reflection agents inherit from the dimension's agent config,
-        # but the orchestrator creates them with llm_for_agent(dimension),
-        # so they'll use whatever that dimension uses. The judge override
-        # only applies to the judge itself.
     },
 )
 
