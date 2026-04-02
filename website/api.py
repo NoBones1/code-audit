@@ -292,6 +292,54 @@ async def upload_files(
     })
 
 
+@app.post("/api/scan/github")
+async def scan_github(req: Request):
+    """Clone a public GitHub repo to a temp dir and start a scan."""
+    body = await req.json()
+    repo_url = body.get("repo_url", "").strip()
+    mode = body.get("mode", "quick")
+
+    if not repo_url or "github.com" not in repo_url:
+        raise HTTPException(status_code=400, detail="Invalid GitHub URL.")
+
+    scan_id = uuid.uuid4().hex
+    tmpdir = tempfile.mkdtemp(prefix="code_audit_")
+
+    async def _clone_and_scan(state: ScanState) -> None:
+        try:
+            state.status = "cloning"
+            await state.event_queue.put({"event": "log", "data": f"Cloning {repo_url}..."})
+
+            clone_proc = await asyncio.create_subprocess_exec(
+                "git", "clone", "--depth=1", repo_url, state.path,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            try:
+                await asyncio.wait_for(clone_proc.wait(), timeout=120)
+            except asyncio.TimeoutError:
+                clone_proc.kill()
+                raise RuntimeError("Git clone timed out after 120s")
+
+            if clone_proc.returncode != 0:
+                err = (await clone_proc.stderr.read()).decode(errors="replace")
+                raise RuntimeError(f"Git clone failed: {err[:200]}")
+
+            await state.event_queue.put({"event": "log", "data": "Clone complete. Starting review..."})
+            await _run_scan(state)
+        except Exception as exc:
+            state.status = "failed"
+            await state.event_queue.put({"event": "error", "data": str(exc)})
+            await state.event_queue.put({"event": "done", "data": "clone_error"})
+            shutil.rmtree(state.path, ignore_errors=True)
+
+    state = ScanState(scan_id=scan_id, path=tmpdir, mode=mode)
+    scans[scan_id] = state
+    asyncio.create_task(_clone_and_scan(state))
+
+    return JSONResponse({"scan_id": scan_id, "repo_url": repo_url, "mode": mode})
+
+
 @app.get("/api/scan/{scan_id}/stream")
 async def scan_stream(scan_id: str, request: Request):
     """SSE endpoint that streams scan output in real-time."""

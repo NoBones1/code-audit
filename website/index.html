@@ -404,7 +404,7 @@
     <div id="hero-url-mode">
       <div class="hero-input-wrap">
         <input class="hero-input" id="hero-input" type="text" placeholder="github.com/your-org/your-repo" spellcheck="false">
-        <button class="hero-scan-btn">Scan Now</button>
+        <button class="hero-scan-btn" onclick="startGithubScan()">Scan Now</button>
       </div>
       <div class="hero-hint">Paste any public GitHub repo URL. No sign-up required.</div>
     </div>
@@ -958,6 +958,47 @@ gsap.from('.cta-title, .cta-sub, .cta-btn, .cta-hint',{opacity:0,y:25,stagger:0.
 ScrollTrigger.create({start:'top -80', onUpdate:self=>{
   document.querySelector('.nav').style.background = self.direction===1 ? 'rgba(6,6,14,0.92)' : 'rgba(6,6,14,0.75)';
 }});
+
+// GitHub URL scan
+function startGithubScan() {
+  const raw = document.getElementById('hero-input').value.trim();
+  if (!raw) { document.getElementById('hero-input').focus(); return; }
+
+  // Normalise: strip protocol, ensure github.com prefix
+  let url = raw.replace(/^https?:\/\//,'');
+  if (!url.includes('github.com')) {
+    alert('Please enter a valid GitHub repo URL (e.g. github.com/owner/repo)');
+    return;
+  }
+
+  const btn = document.querySelector('.hero-scan-btn');
+  btn.textContent = 'Starting...';
+  btn.disabled = true;
+
+  fetch('/api/scan/github', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({repo_url: 'https://' + url, mode: 'quick'})
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.scan_id) {
+      window.location.href = '/try?scan_id=' + data.scan_id;
+    } else {
+      alert('Error: ' + (data.detail || 'Could not start scan'));
+      btn.textContent = 'Scan Now'; btn.disabled = false;
+    }
+  })
+  .catch(() => {
+    alert('Server not running. Start it with: cd website && python api.py');
+    btn.textContent = 'Scan Now'; btn.disabled = false;
+  });
+}
+
+// Allow Enter key in the input
+document.getElementById('hero-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') startGithubScan();
+});
 
 // Hero toggle: URL vs Upload
 function toggleHeroMode(mode) {
