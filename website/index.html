@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CodeAudit — AI Code Review. 5 Agents. $0.00.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <style>
+    :root {
+      --bg: #06060e;
+      --bg2: #0c0d16;
+      --surf: #12131e;
+      --bord: rgba(255,255,255,0.06);
+      --teal: #00F5D4;
+      --teal-dim: rgba(0,245,212,0.12);
+      --teal-glow: rgba(0,245,212,0.25);
+      --purple: #8B5CF6;
+      --purple-dim: rgba(139,92,246,0.12);
+      --red: #FF3366;
+      --amber: #FFB800;
+      --green: #30D158;
+      --txt: #e4e8f0;
+      --txt2: #8b90a8;
+      --txt3: #52566e;
+      --fD: 'Outfit', sans-serif;
+      --fB: 'Inter', sans-serif;
+      --fM: 'JetBrains Mono', monospace;
+    }
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    html { scroll-behavior: smooth; }
+    body { background: var(--bg); color: var(--txt); font-family: var(--fB); overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+
+    /* Noise grain overlay */
+    body::before {
+      content: ''; position: fixed; inset: 0; z-index: 9999; pointer-events: none;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+      background-repeat: repeat; opacity: 0.6;
+    }
+
+    /* Scroll progress */
+    .scroll-bar { position: fixed; top: 0; left: 0; height: 2px; background: linear-gradient(90deg, var(--teal), var(--purple)); z-index: 1000; width: 0%; }
+
+    /* ── NAV ── */
+    .nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      padding: 1rem 2.5rem; display: flex; align-items: center; justify-content: space-between;
+      backdrop-filter: blur(20px); background: rgba(6,6,14,0.75); border-bottom: 1px solid var(--bord);
+    }
+    .nav-brand { font-family: var(--fM); font-weight: 700; font-size: 0.95rem; letter-spacing: 0.06em; color: var(--txt); }
+    .nav-brand span { color: var(--teal); }
+    .nav-links { display: flex; gap: 2rem; list-style: none; }
+    .nav-links a { color: var(--txt2); text-decoration: none; font-size: 0.88rem; transition: color 0.2s; font-weight: 500; }
+    .nav-links a:hover { color: var(--teal); }
+    .nav-cta {
+      padding: 0.5rem 1.4rem; font-size: 0.85rem; font-weight: 600;
+      background: var(--teal-dim); color: var(--teal); border: 1px solid rgba(0,245,212,0.3);
+      border-radius: 8px; cursor: pointer; transition: all 0.2s; font-family: var(--fB);
+    }
+    .nav-cta:hover { background: rgba(0,245,212,0.2); box-shadow: 0 0 20px var(--teal-glow); }
+
+    /* ── HERO ── */
+    .hero {
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      text-align: center; padding: 10rem 1.5rem 6rem; position: relative; overflow: hidden;
+    }
+    .hero-aurora {
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 90% 60% at 50% -10%, rgba(0,245,212,0.12), transparent 55%),
+        radial-gradient(ellipse 60% 50% at 15% 80%, rgba(139,92,246,0.08), transparent 50%),
+        radial-gradient(ellipse 50% 40% at 85% 50%, rgba(0,245,212,0.06), transparent 50%);
+      animation: aurora 10s ease-in-out infinite alternate;
+    }
+    @keyframes aurora { 0%{filter:hue-rotate(0deg) brightness(1)} 100%{filter:hue-rotate(15deg) brightness(1.1)} }
+    .hero-content { position: relative; z-index: 2; max-width: 780px; }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 0.4rem 1.1rem; font-size: 0.75rem; font-weight: 600; font-family: var(--fM);
+      background: var(--surf); border: 1px solid var(--bord); border-radius: 100px;
+      color: var(--teal); margin-bottom: 2.5rem; letter-spacing: 0.04em;
+    }
+    .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--teal); animation: blink 2s ease-in-out infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    .hero-title {
+      font-family: var(--fD); font-size: clamp(3rem, 8vw, 5.5rem); font-weight: 800;
+      line-height: 1.05; letter-spacing: -0.04em;
+    }
+    .hero-title .line1 { display: block; color: var(--txt); }
+    .hero-title .line2 {
+      display: block;
+      background: linear-gradient(135deg, var(--teal) 0%, var(--purple) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .hero-sub {
+      color: var(--txt2); font-size: clamp(1rem, 2.2vw, 1.25rem); margin-top: 1.8rem;
+      line-height: 1.7; max-width: 560px; margin-inline: auto;
+    }
+
+    /* GitHub URL input */
+    .hero-input-wrap {
+      margin-top: 2.5rem; display: flex; gap: 0; max-width: 520px; margin-inline: auto;
+      background: var(--surf); border: 1px solid var(--bord); border-radius: 12px;
+      overflow: hidden; transition: border-color 0.3s;
+    }
+    .hero-input-wrap:focus-within { border-color: rgba(0,245,212,0.4); box-shadow: 0 0 24px rgba(0,245,212,0.1); }
+    .hero-input {
+      flex: 1; padding: 0.95rem 1.2rem; background: transparent; border: none; outline: none;
+      color: var(--txt); font-family: var(--fM); font-size: 0.85rem;
+    }
+    .hero-input::placeholder { color: var(--txt3); }
+    .hero-scan-btn {
+      padding: 0.95rem 1.6rem; background: var(--teal); color: #000; border: none;
+      font-family: var(--fD); font-size: 0.9rem; font-weight: 700; cursor: pointer;
+      transition: background 0.2s; letter-spacing: 0.02em;
+    }
+    .hero-scan-btn:hover { background: #33FFE0; }
+    .hero-hint { margin-top: 0.8rem; font-size: 0.75rem; color: var(--txt3); font-family: var(--fM); }
+
+    /* ── STATS ── */
+    .stats {
+      display: flex; justify-content: center; gap: clamp(2rem, 6vw, 6rem); padding: 5rem 1.5rem;
+      border-top: 1px solid var(--bord); border-bottom: 1px solid var(--bord); flex-wrap: wrap;
+    }
+    .stat { text-align: center; }
+    .stat-num { font-family: var(--fM); font-size: clamp(2.2rem, 5vw, 3.2rem); font-weight: 700; color: var(--teal); }
+    .stat-label { font-size: 0.85rem; color: var(--txt2); margin-top: 0.3rem; }
+
+    /* ── SECTION COMMON ── */
+    .section { padding: 8rem 1.5rem; max-width: 1100px; margin: 0 auto; }
+    .section-label {
+      font-family: var(--fM); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.14em;
+      text-transform: uppercase; color: var(--teal); margin-bottom: 1.2rem; text-align: center;
+    }
+    .section-title {
+      font-family: var(--fD); font-size: clamp(2.2rem, 5vw, 3.5rem); font-weight: 800;
+      text-align: center; letter-spacing: -0.03em; line-height: 1.1; margin-bottom: 1rem;
+    }
+    .section-sub { text-align: center; color: var(--txt2); max-width: 520px; margin: 0 auto 3.5rem; line-height: 1.7; }
+
+    /* ── HOW IT WORKS ── */
+    .steps-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    .step-card {
+      background: var(--surf); border: 1px solid var(--bord); border-radius: 16px;
+      padding: 2.5rem 2rem; text-align: center; position: relative; overflow: hidden;
+      transition: border-color 0.3s, transform 0.3s;
+    }
+    .step-card:hover { border-color: rgba(0,245,212,0.2); transform: translateY(-4px); }
+    .step-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--teal), transparent); opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .step-card:hover::before { opacity: 1; }
+    .step-num {
+      font-family: var(--fD); font-size: 3rem; font-weight: 900; color: rgba(0,245,212,0.08);
+      position: absolute; top: 12px; right: 18px; line-height: 1;
+    }
+    .step-icon { font-size: 2.8rem; margin-bottom: 1.2rem; }
+    .step-title { font-family: var(--fD); font-size: 1.15rem; font-weight: 700; margin-bottom: 0.6rem; }
+    .step-desc { font-size: 0.88rem; color: var(--txt2); line-height: 1.6; }
+
+    /* ── AGENTS ── */
+    .agents-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
+    .agent-card {
+      background: var(--surf); border: 1px solid var(--bord); border-radius: 14px;
+      padding: 1.8rem 1.4rem; text-align: center; position: relative;
+      transition: all 0.3s; overflow: hidden;
+    }
+    .agent-card:hover { transform: translateY(-6px); }
+    .agent-card::after {
+      content: ''; position: absolute; inset: -1px; border-radius: inherit;
+      background: linear-gradient(135deg, var(--agent-color, var(--teal)) 0%, transparent 60%);
+      opacity: 0; transition: opacity 0.3s; z-index: 0;
+    }
+    .agent-card:hover::after { opacity: 0.08; }
+    .agent-card > * { position: relative; z-index: 1; }
+    .agent-icon { font-size: 2rem; margin-bottom: 0.8rem; }
+    .agent-name { font-family: var(--fD); font-size: 0.95rem; font-weight: 700; margin-bottom: 0.4rem; }
+    .agent-desc { font-size: 0.78rem; color: var(--txt2); line-height: 1.5; }
+    .agent-tag {
+      display: inline-block; margin-top: 0.8rem; font-family: var(--fM); font-size: 0.65rem;
+      padding: 2px 8px; border-radius: 4px; border: 1px solid; letter-spacing: 0.04em;
+    }
+
+    /* ── FEATURES TABS ── */
+    .feat-tabs { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-bottom: 3rem; }
+    .feat-tab {
+      padding: 0.55rem 1.4rem; background: var(--surf); border: 1px solid var(--bord);
+      border-radius: 100px; color: var(--txt2); font-size: 0.85rem; font-weight: 500;
+      cursor: pointer; transition: all 0.25s; font-family: var(--fB);
+    }
+    .feat-tab.active { background: var(--teal-dim); border-color: rgba(0,245,212,0.3); color: var(--teal); }
+    .feat-panel {
+      display: none; background: var(--surf); border: 1px solid var(--bord); border-radius: 16px;
+      padding: 2.5rem; min-height: 200px;
+    }
+    .feat-panel.active { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: center; animation: fadeUp 0.4s ease; }
+    @keyframes fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+    .feat-text h3 { font-family: var(--fD); font-size: 1.5rem; font-weight: 700; margin-bottom: 0.8rem; }
+    .feat-text p { color: var(--txt2); line-height: 1.7; font-size: 0.92rem; }
+    .feat-text ul { margin-top: 1rem; list-style: none; }
+    .feat-text li { padding: 0.3rem 0; font-size: 0.88rem; color: var(--txt2); }
+    .feat-text li::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--teal); margin-right: 10px; vertical-align: middle; }
+
+    /* Terminal preview */
+    .feat-terminal {
+      background: #0a0a14; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px;
+      overflow: hidden; font-family: var(--fM); font-size: 0.75rem; line-height: 1.7;
+    }
+    .term-bar {
+      padding: 8px 14px; background: rgba(255,255,255,0.04); border-bottom: 1px solid rgba(255,255,255,0.06);
+      display: flex; align-items: center; gap: 6px;
+    }
+    .term-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .term-body { padding: 14px 16px; color: var(--txt2); max-height: 220px; overflow-y: auto; }
+    .term-body .t-teal { color: var(--teal); }
+    .term-body .t-red { color: var(--red); }
+    .term-body .t-amb { color: var(--amber); }
+    .term-body .t-grn { color: var(--green); }
+    .term-body .t-pur { color: var(--purple); }
+
+    /* ── COMPARISON TABLE ── */
+    .compare-section { padding: 8rem 1.5rem; max-width: 900px; margin: 0 auto; }
+    .compare-table {
+      width: 100%; border-collapse: collapse; margin-top: 2rem;
+      background: var(--surf); border: 1px solid var(--bord); border-radius: 14px; overflow: hidden;
+    }
+    .compare-table th {
+      padding: 1rem 1.2rem; text-align: left; font-size: 0.75rem; font-weight: 600;
+      letter-spacing: 0.08em; text-transform: uppercase; color: var(--txt3);
+      border-bottom: 1px solid var(--bord); font-family: var(--fM);
+    }
+    .compare-table td {
+      padding: 0.9rem 1.2rem; font-size: 0.9rem; border-bottom: 1px solid rgba(255,255,255,0.03);
+    }
+    .compare-table tr:last-child td { border-bottom: none; }
+    .compare-table tr:first-of-type td { font-weight: 600; color: var(--teal); }
+    .compare-table .check { color: var(--green); font-size: 1.1rem; }
+    .compare-table .cross { color: var(--red); opacity: 0.5; font-size: 1.1rem; }
+    .compare-table .price-free { color: var(--green); font-weight: 700; font-family: var(--fM); }
+    .compare-table .price-paid { color: var(--red); font-family: var(--fM); }
+
+    /* ── CTA ── */
+    .cta {
+      padding: 10rem 1.5rem; text-align: center; position: relative;
+      background: radial-gradient(ellipse 80% 50% at 50% 100%, rgba(0,245,212,0.06), transparent 60%);
+    }
+    .cta-title { font-family: var(--fD); font-size: clamp(2.5rem, 6vw, 4rem); font-weight: 800; letter-spacing: -0.03em; margin-bottom: 1rem; }
+    .cta-sub { color: var(--txt2); margin-bottom: 2.5rem; font-size: 1.1rem; }
+    .cta-btn {
+      padding: 1rem 2.5rem; background: var(--teal); color: #000; border: none;
+      border-radius: 12px; font-family: var(--fD); font-size: 1.1rem; font-weight: 700;
+      cursor: pointer; transition: all 0.3s; letter-spacing: 0.02em;
+    }
+    .cta-btn:hover { box-shadow: 0 0 40px var(--teal-glow), 0 0 80px rgba(0,245,212,0.12); transform: translateY(-2px); }
+    .cta-hint { margin-top: 1rem; font-size: 0.8rem; color: var(--txt3); font-family: var(--fM); }
+
+    /* ── FOOTER ── */
+    .footer {
+      padding: 3rem 2rem 2rem; border-top: 1px solid var(--bord);
+      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;
+      max-width: 1100px; margin: 0 auto;
+    }
+    .footer-brand { font-family: var(--fM); font-size: 0.85rem; color: var(--txt3); }
+    .footer-links { display: flex; gap: 1.5rem; }
+    .footer-links a { color: var(--txt3); text-decoration: none; font-size: 0.82rem; transition: color 0.2s; }
+    .footer-links a:hover { color: var(--teal); }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 900px) {
+      .agents-grid { grid-template-columns: repeat(3, 1fr); }
+      .feat-panel.active { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 640px) {
+      .nav-links { display: none; }
+      .steps-grid { grid-template-columns: 1fr; }
+      .agents-grid { grid-template-columns: repeat(2, 1fr); }
+      .compare-table { font-size: 0.8rem; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="scroll-bar" id="scrollBar"></div>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-brand">CODE<span>AUDIT</span></div>
+  <ul class="nav-links">
+    <li><a href="#how">How It Works</a></li>
+    <li><a href="#agents">Agents</a></li>
+    <li><a href="#features">Features</a></li>
+    <li><a href="#pricing">Pricing</a></li>
+    <li><a href="https://github.com/NoBones1/code-audit" target="_blank">GitHub</a></li>
+  </ul>
+  <button class="nav-cta" onclick="document.getElementById('hero-input').focus()">Try Free</button>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-aurora"></div>
+  <div class="hero-content">
+    <span class="hero-badge"><span class="badge-dot"></span>Open Source · Free Forever</span>
+    <h1 class="hero-title">
+      <span class="line1">AI Code Review.</span>
+      <span class="line2">5 Agents. $0.00.</span>
+    </h1>
+    <p class="hero-sub">Five specialist AI agents review your code in parallel — security, architecture, performance, correctness, and maintainability. Then a judge aggregates the best findings. Completely free.</p>
+    <div class="hero-input-wrap">
+      <input class="hero-input" id="hero-input" type="text" placeholder="github.com/your-org/your-repo" spellcheck="false">
+      <button class="hero-scan-btn">Scan Now</button>
+    </div>
+    <div class="hero-hint">Paste any public GitHub repo URL. No sign-up required.</div>
+  </div>
+</section>
+
+<!-- STATS -->
+<section class="stats" id="stats">
+  <div class="stat"><div class="stat-num" data-target="5" data-suffix=" Agents">0</div><div class="stat-label">Running in parallel</div></div>
+  <div class="stat"><div class="stat-num" data-target="0" data-prefix="$" data-suffix=".00">$0</div><div class="stat-label">Cost per review</div></div>
+  <div class="stat"><div class="stat-num" data-target="6" data-suffix=" Languages">0</div><div class="stat-label">Tree-sitter supported</div></div>
+  <div class="stat"><div class="stat-num" data-target="30" data-suffix="+" data-prefix="">0</div><div class="stat-label">Secret patterns detected</div></div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="section" id="how">
+  <div class="section-label">How It Works</div>
+  <h2 class="section-title">Three steps to better code</h2>
+  <p class="section-sub">Paste a repo, let AI agents review, get actionable findings with suggested fixes. No configuration needed.</p>
+  <div class="steps-grid">
+    <div class="step-card" id="step-1">
+      <div class="step-num">01</div>
+      <div class="step-icon">📋</div>
+      <div class="step-title">Point at your code</div>
+      <div class="step-desc">Paste a GitHub URL, run the CLI, or trigger from a PR. CodeAudit gathers context — diffs, imports, dependencies, and your team's review rules.</div>
+    </div>
+    <div class="step-card" id="step-2">
+      <div class="step-num">02</div>
+      <div class="step-icon">🧠</div>
+      <div class="step-title">5 agents review in parallel</div>
+      <div class="step-desc">Security, Architecture, Performance, Functional, and Maintainability agents each independently analyse your code. Then a Judge agent deduplicates and ranks findings.</div>
+    </div>
+    <div class="step-card" id="step-3">
+      <div class="step-num">03</div>
+      <div class="step-icon">📊</div>
+      <div class="step-title">Get actionable findings</div>
+      <div class="step-desc">Receive a ranked report with severity, confidence scores, code snippets, and suggested fixes. Export as Markdown, SARIF, or inline PR comments.</div>
+    </div>
+  </div>
+</section>
+
+<!-- THE 5 AGENTS -->
+<section class="section" id="agents">
+  <div class="section-label">Multi-Agent Architecture</div>
+  <h2 class="section-title">Not one model. Five specialists.</h2>
+  <p class="section-sub">Each agent is purpose-built with domain-specific prompts, scoring rubrics, and OWASP/CWE knowledge. They don't agree with each other — that's the point.</p>
+  <div class="agents-grid">
+    <div class="agent-card" style="--agent-color: #FF3366;">
+      <div class="agent-icon">🔒</div>
+      <div class="agent-name">Security</div>
+      <div class="agent-desc">OWASP Top 10, injection, auth flaws, crypto issues, credential exposure</div>
+      <div class="agent-tag" style="color:#FF3366; border-color:rgba(255,51,102,0.3);">OWASP-A01..A10</div>
+    </div>
+    <div class="agent-card" style="--agent-color: #00F5D4;">
+      <div class="agent-icon">🏗️</div>
+      <div class="agent-name">Architecture</div>
+      <div class="agent-desc">Design patterns, coupling, modularity, scalability, circular dependencies</div>
+      <div class="agent-tag" style="color:#00F5D4; border-color:rgba(0,245,212,0.3);">SOLID + DDD</div>
+    </div>
+    <div class="agent-card" style="--agent-color: #FFB800;">
+      <div class="agent-icon">⚡</div>
+      <div class="agent-name">Performance</div>
+      <div class="agent-desc">N+1 queries, blocking I/O, memory leaks, algorithm complexity, caching</div>
+      <div class="agent-tag" style="color:#FFB800; border-color:rgba(255,184,0,0.3);">O(n) ANALYSIS</div>
+    </div>
+    <div class="agent-card" style="--agent-color: #8B5CF6;">
+      <div class="agent-icon">✅</div>
+      <div class="agent-name">Functional</div>
+      <div class="agent-desc">Logic bugs, edge cases, incorrect behavior, missing error handling, race conditions</div>
+      <div class="agent-tag" style="color:#8B5CF6; border-color:rgba(139,92,246,0.3);">LOGIC + EDGE</div>
+    </div>
+    <div class="agent-card" style="--agent-color: #30D158;">
+      <div class="agent-icon">📐</div>
+      <div class="agent-name">Maintainability</div>
+      <div class="agent-desc">Readability, naming, complexity, test coverage, documentation gaps</div>
+      <div class="agent-tag" style="color:#30D158; border-color:rgba(48,209,88,0.3);">CLEAN CODE</div>
+    </div>
+  </div>
+  <div style="text-align:center; margin-top:2.5rem;">
+    <span style="font-size:0.85rem; color:var(--txt2); display:inline-flex; align-items:center; gap:8px;">
+      <span style="font-size:1.4rem;">⚖️</span>
+      <span>Plus a <strong style="color:var(--teal);">Judge Agent</strong> that deduplicates, ranks, and links related findings across all 5 dimensions</span>
+    </span>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="section" id="features">
+  <div class="section-label">Capabilities</div>
+  <h2 class="section-title">Every integration you need</h2>
+  <p class="section-sub">CLI, IDE plugin, GitHub PR comments, secrets scanning, and dependency auditing — all built in.</p>
+  <div class="feat-tabs">
+    <button class="feat-tab active" data-ft="cli">CLI</button>
+    <button class="feat-tab" data-ft="plugin">Claude Plugin</button>
+    <button class="feat-tab" data-ft="github">GitHub PRs</button>
+    <button class="feat-tab" data-ft="vscode">VS Code</button>
+    <button class="feat-tab" data-ft="secrets">Secrets Scan</button>
+    <button class="feat-tab" data-ft="deps">Dep Audit</button>
+  </div>
+  <div class="feat-panel active" data-fp="cli">
+    <div class="feat-text">
+      <h3>Powerful CLI</h3>
+      <p>Run code audits from anywhere. Three modes to choose from — quick (2 min), deep (8-15 min, all 5 agents), and security-focused. Output to terminal, Markdown, or SARIF.</p>
+      <ul>
+        <li>code-audit review --mode deep</li>
+        <li>code-audit review --mode security</li>
+        <li>code-audit init (generate REVIEW.md)</li>
+        <li>Markdown + SARIF report output</li>
+      </ul>
+    </div>
+    <div class="feat-terminal">
+      <div class="term-bar">
+        <div class="term-dot" style="background:#FF5F57"></div>
+        <div class="term-dot" style="background:#FEBC2E"></div>
+        <div class="term-dot" style="background:#28C840"></div>
+      </div>
+      <div class="term-body">
+        <div><span class="t-teal">$</span> code-audit review --mode deep --path .</div>
+        <div><span class="t-teal">></span> Gathering context from 34 files...</div>
+        <div><span class="t-grn">></span> Secrets scan: 2 findings (regex, $0.00)</div>
+        <div><span class="t-grn">></span> Dependency scan: 0 CVEs found</div>
+        <div><span class="t-teal">></span> Spawning 5 specialist agents...</div>
+        <div><span class="t-grn">></span> Security agent done (6 findings, 34s)</div>
+        <div><span class="t-grn">></span> Architectural agent done (4 findings)</div>
+        <div><span class="t-grn">></span> Performance agent done (3 findings)</div>
+        <div><span class="t-grn">></span> Functional agent done (5 findings)</div>
+        <div><span class="t-grn">></span> Maintainability agent done (3 findings)</div>
+        <div><span class="t-teal">></span> Judge aggregating 21 findings...</div>
+        <div><span class="t-grn">></span> Report: 23 findings | Cost: <span class="t-grn">$0.00</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="feat-panel" data-fp="plugin">
+    <div class="feat-text">
+      <h3>Claude Code Plugin</h3>
+      <p>Type <code style="background:rgba(0,245,212,0.1);padding:2px 6px;border-radius:4px;color:var(--teal);font-family:var(--fM);font-size:0.85em;">/code-audit</code> inside Claude Code to run a full multi-agent review on your current project. Results appear inline.</p>
+      <ul>
+        <li>One-command activation</li>
+        <li>Full project analysis (not just diffs)</li>
+        <li>Findings displayed inline</li>
+        <li>Auto-fix suggestions</li>
+      </ul>
+    </div>
+    <div class="feat-terminal">
+      <div class="term-bar"><div class="term-dot" style="background:#FF5F57"></div><div class="term-dot" style="background:#FEBC2E"></div><div class="term-dot" style="background:#28C840"></div></div>
+      <div class="term-body">
+        <div><span class="t-pur">Claude ></span> /code-audit</div>
+        <div><span class="t-teal">></span> Running deep audit on current project...</div>
+        <div><span class="t-teal">></span> 5 agents + judge + secrets + deps</div>
+        <div></div>
+        <div><span class="t-red">IMPORTANT</span> Missing HMAC verification</div>
+        <div>  webhook.py:67 | conf: 97%</div>
+        <div><span class="t-amb">NIT</span> Tree-sitter parsers re-initialized</div>
+        <div>  parsers.py:22 | conf: 82%</div>
+        <div></div>
+        <div><span class="t-grn">></span> 23 findings | 10 important | 12 nits</div>
+      </div>
+    </div>
+  </div>
+  <div class="feat-panel" data-fp="github">
+    <div class="feat-text">
+      <h3>GitHub PR Integration</h3>
+      <p>CodeAudit reviews every pull request automatically and posts findings as inline comments with severity badges, code snippets, and fix suggestions. Uses GitHub Check Runs for CI/CD integration.</p>
+      <ul>
+        <li>Auto-trigger on PR open/update</li>
+        <li>Inline comment annotations</li>
+        <li>GitHub Check Run with SARIF</li>
+        <li>Webhook with HMAC verification</li>
+      </ul>
+    </div>
+    <div class="feat-terminal">
+      <div class="term-bar"><div class="term-dot" style="background:#FF5F57"></div><div class="term-dot" style="background:#FEBC2E"></div><div class="term-dot" style="background:#28C840"></div></div>
+      <div class="term-body">
+        <div><span class="t-teal">PR #47</span> feat: add reflection loop</div>
+        <div></div>
+        <div><span class="t-red">@code-audit</span> [IMPORTANT]</div>
+        <div>Reflection loop passes deterministic</div>
+        <div>secrets findings to LLM for review.</div>
+        <div>Filter out dimension=secrets before</div>
+        <div>calling reflector. <span class="t-teal">conf: 94%</span></div>
+        <div></div>
+        <div><span class="t-grn">Check Run:</span> 23 findings uploaded</div>
+      </div>
+    </div>
+  </div>
+  <div class="feat-panel" data-fp="vscode">
+    <div class="feat-text">
+      <h3>VS Code Extension</h3>
+      <p>Install the .vsix extension to run audits directly from your editor. Findings appear as diagnostics in the Problems panel with quick-fix suggestions.</p>
+      <ul>
+        <li>One-click install (.vsix)</li>
+        <li>Problems panel integration</li>
+        <li>Quick-fix code actions</li>
+        <li>Status bar progress indicator</li>
+      </ul>
+    </div>
+    <div class="feat-terminal">
+      <div class="term-bar"><div class="term-dot" style="background:#FF5F57"></div><div class="term-dot" style="background:#FEBC2E"></div><div class="term-dot" style="background:#28C840"></div></div>
+      <div class="term-body">
+        <div style="color:var(--txt3)">PROBLEMS (23)</div>
+        <div></div>
+        <div><span class="t-red">E</span> API keys logged at DEBUG level</div>
+        <div>  openai_compat.py:34 [security]</div>
+        <div><span class="t-red">E</span> Sequential file reading blocks</div>
+        <div>  gatherer.py:89 [performance]</div>
+        <div><span class="t-amb">W</span> Magic number not documented</div>
+        <div>  orchestrator.py:156 [maintain.]</div>
+        <div></div>
+        <div style="color:var(--txt3)">Quick Fix: Extract to constant...</div>
+      </div>
+    </div>
+  </div>
+  <div class="feat-panel" data-fp="secrets">
+    <div class="feat-text">
+      <h3>Secrets Detection</h3>
+      <p>Deterministic regex scan runs before LLM agents at zero cost. Catches hardcoded API keys, tokens, passwords, and private keys with 30+ patterns.</p>
+      <ul>
+        <li>AWS keys, GitHub tokens, Slack tokens</li>
+        <li>Private keys (RSA, EC, DSA, OPENSSH)</li>
+        <li>High-entropy string detection</li>
+        <li>Smart allowlist (skips tests, examples)</li>
+      </ul>
+    </div>
+    <div class="feat-terminal">
+      <div class="term-bar"><div class="term-dot" style="background:#FF5F57"></div><div class="term-dot" style="background:#FEBC2E"></div><div class="term-dot" style="background:#28C840"></div></div>
+      <div class="term-body">
+        <div><span class="t-teal">Phase 0:</span> Secrets Scan (regex, $0.00)</div>
+        <div></div>
+        <div><span class="t-red">FOUND</span> AWS Access Key</div>
+        <div>  config.py:12 AKIA************</div>
+        <div><span class="t-red">FOUND</span> GitHub PAT</div>
+        <div>  deploy.sh:5  ghp_***********</div>
+        <div><span class="t-amb">FOUND</span> High-entropy string</div>
+        <div>  .env:8 near keyword "API_KEY"</div>
+        <div></div>
+        <div><span class="t-grn">></span> 3 secrets found | 0 false positives</div>
+      </div>
+    </div>
+  </div>
+  <div class="feat-panel" data-fp="deps">
+    <div class="feat-text">
+      <h3>Dependency Audit (SCA)</h3>
+      <p>Automatically detects your package manager and checks for known CVEs using free tools — npm audit, pip-audit, osv-scanner, cargo-audit. Zero cost.</p>
+      <ul>
+        <li>npm / pip / go / cargo supported</li>
+        <li>CVE severity mapping</li>
+        <li>Graceful degradation (missing tools)</li>
+        <li>osv-scanner as universal fallback</li>
+      </ul>
+    </div>
+    <div class="feat-terminal">
+      <div class="term-bar"><div class="term-dot" style="background:#FF5F57"></div><div class="term-dot" style="background:#FEBC2E"></div><div class="term-dot" style="background:#28C840"></div></div>
+      <div class="term-body">
+        <div><span class="t-teal">Phase 0.5:</span> Dependency Scan ($0.00)</div>
+        <div></div>
+        <div><span class="t-grn">></span> Detected: package.json (npm)</div>
+        <div><span class="t-grn">></span> Running: npm audit --json</div>
+        <div></div>
+        <div><span class="t-red">CVE-2024-4068</span> braces ReDoS</div>
+        <div>  severity: high | fix: upgrade</div>
+        <div><span class="t-amb">CVE-2024-3651</span> idna DoS</div>
+        <div>  severity: moderate | fix: >=3.7</div>
+        <div></div>
+        <div><span class="t-grn">></span> 2 vulnerabilities found</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- COMPARISON -->
+<section class="compare-section" id="pricing">
+  <div class="section-label">Pricing Comparison</div>
+  <h2 class="section-title">Why pay $24/month?</h2>
+  <p class="section-sub">CodeAudit does what expensive tools do, using free-tier AI providers. No catch.</p>
+  <table class="compare-table">
+    <thead>
+      <tr><th>Feature</th><th>CodeAudit</th><th>CodeRabbit</th><th>Snyk Code</th><th>Manual Review</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Price</td><td class="price-free">$0.00</td><td class="price-paid">$24/mo/dev</td><td class="price-paid">$98/mo</td><td>$$$ (eng time)</td></tr>
+      <tr><td>Multi-agent (5+ agents)</td><td class="check">&#10003;</td><td class="cross">&#10007;</td><td class="cross">&#10007;</td><td class="cross">&#10007;</td></tr>
+      <tr><td>Secrets scanning</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td style="color:var(--txt3)">Manual</td></tr>
+      <tr><td>Dependency audit (SCA)</td><td class="check">&#10003;</td><td class="cross">&#10007;</td><td class="check">&#10003;</td><td class="cross">&#10007;</td></tr>
+      <tr><td>SARIF reports</td><td class="check">&#10003;</td><td class="cross">&#10007;</td><td class="check">&#10003;</td><td class="cross">&#10007;</td></tr>
+      <tr><td>Team memory</td><td class="check">&#10003;</td><td class="cross">&#10007;</td><td class="cross">&#10007;</td><td style="color:var(--txt3)">Tribal</td></tr>
+      <tr><td>Self-reflection loop</td><td class="check">&#10003;</td><td class="cross">&#10007;</td><td class="cross">&#10007;</td><td class="check">&#10003;</td></tr>
+      <tr><td>Open source</td><td class="check">&#10003;</td><td class="cross">&#10007;</td><td class="cross">&#10007;</td><td>N/A</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- CTA -->
+<section class="cta">
+  <h2 class="cta-title">Ship better code. For free.</h2>
+  <p class="cta-sub">No sign-up. No credit card. No catch. Just paste a repo URL.</p>
+  <button class="cta-btn" onclick="document.getElementById('hero-input').focus(); window.scrollTo({top:0,behavior:'smooth'});">Start Scanning</button>
+  <div class="cta-hint">Open source · NVIDIA + Gemini free tiers · Unlimited scans</div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="footer-brand">CodeAudit &copy; 2026. Built with AI, reviewed by AI.</div>
+  <div class="footer-links">
+    <a href="https://github.com/NoBones1/code-audit" target="_blank">GitHub</a>
+    <a href="#">Docs</a>
+    <a href="#">CLI</a>
+    <a href="#">Plugin</a>
+    <a href="#">VS Code</a>
+  </div>
+</footer>
+
+<script>
+gsap.registerPlugin(ScrollTrigger);
+
+// Scroll progress
+gsap.to('#scrollBar', { width:'100%', ease:'none', scrollTrigger:{trigger:document.body, start:'top top', end:'bottom bottom', scrub:0.3}});
+
+// Hero entrance
+gsap.from('.hero-content > *', { opacity:0, y:30, stagger:0.12, duration:0.8, ease:'power2.out', delay:0.3 });
+
+// Stats counter with scramble
+(function(){
+  const chars='0123456789!@#$%^&*';
+  function scramble(el, target, prefix, suffix, dur){
+    let s=performance.now();
+    (function tick(now){
+      let p=Math.min((now-s)/dur,1), e=1-Math.pow(1-p,3), cur=Math.round(target*e);
+      if(p<0.65){
+        let sc=''; String(cur).split('').forEach(c=>sc+=Math.random()>0.4?chars[Math.floor(Math.random()*chars.length)]:c);
+        el.textContent=(prefix||'')+sc+(suffix||'');
+      } else {
+        el.textContent=(prefix||'')+cur+(suffix||'');
+      }
+      if(p<1) requestAnimationFrame(tick);
+    })(performance.now());
+  }
+  ScrollTrigger.create({trigger:'.stats',start:'top 80%',once:true,onEnter:()=>{
+    document.querySelectorAll('.stat-num').forEach(el=>{
+      scramble(el,parseFloat(el.dataset.target),el.dataset.prefix||'',el.dataset.suffix||'',1800);
+    });
+  }});
+})();
+
+// Steps stagger
+gsap.from('.step-card',{opacity:0,y:40,stagger:0.15,duration:0.7,ease:'power2.out',scrollTrigger:{trigger:'.steps-grid',start:'top 80%'}});
+
+// Agents stagger
+gsap.from('.agent-card',{opacity:0,y:30,scale:0.95,stagger:0.08,duration:0.6,ease:'power2.out',scrollTrigger:{trigger:'.agents-grid',start:'top 80%'}});
+
+// Section labels
+document.querySelectorAll('.section-label, .section-title, .section-sub').forEach(el=>{
+  gsap.from(el,{opacity:0,y:20,duration:0.6,scrollTrigger:{trigger:el,start:'top 85%'}});
+});
+
+// Feature tabs
+document.querySelectorAll('.feat-tab').forEach(t=>{
+  t.addEventListener('click',()=>{
+    document.querySelectorAll('.feat-tab').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.feat-panel').forEach(p=>p.classList.remove('active'));
+    t.classList.add('active');
+    document.querySelector(`[data-fp="${t.dataset.ft}"]`).classList.add('active');
+  });
+});
+
+// Comparison table rows
+gsap.from('.compare-table tbody tr',{opacity:0,x:-20,stagger:0.06,duration:0.5,ease:'power2.out',scrollTrigger:{trigger:'.compare-table',start:'top 80%'}});
+
+// CTA
+gsap.from('.cta-title, .cta-sub, .cta-btn, .cta-hint',{opacity:0,y:25,stagger:0.1,duration:0.7,scrollTrigger:{trigger:'.cta',start:'top 75%'}});
+
+// Nav background on scroll
+ScrollTrigger.create({start:'top -80', onUpdate:self=>{
+  document.querySelector('.nav').style.background = self.direction===1 ? 'rgba(6,6,14,0.92)' : 'rgba(6,6,14,0.75)';
+}});
+</script>
+</body>
+</html>

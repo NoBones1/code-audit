@@ -318,9 +318,69 @@
     #scan-overlay { display: none; position: fixed; inset: 0; z-index: 100; background: rgba(7,7,15,0.90); backdrop-filter: blur(20px); align-items: center; justify-content: center; }
     #scan-overlay.vis { display: flex; animation: oin 240ms ease; }
     @keyframes oin { from{opacity:0} to{opacity:1} }
-    .scan-modal { background: var(--bg2); border: 1px solid var(--border); border-radius: 16px; padding: 28px; width: 480px; position: relative; }
+    .scan-modal { background: var(--bg2); border: 1px solid var(--border); border-radius: 16px; padding: 28px; width: 540px; position: relative; max-height: 90vh; overflow-y: auto; }
+    .scan-modal::-webkit-scrollbar { width: 3px; }
+    .scan-modal::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); }
     .sm-title { font-family: var(--fB); font-size: 13px; font-weight: 700; letter-spacing: 0.08em; color: var(--teal); margin-bottom: 3px; }
     .sm-sub { font-size: 11px; color: var(--t3); font-family: var(--fM); margin-bottom: 20px; }
+    .scan-close { position: absolute; top: 14px; right: 14px; width: 26px; height: 26px; background: var(--card); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 13px; color: var(--t2); transition: all 140ms; z-index: 2; }
+    .scan-close:hover { background: var(--card-hover); color: var(--t1); }
+
+    /* Scan Setup Form */
+    .scan-section { margin-bottom: 18px; }
+    .scan-label { font-size: 10px; font-weight: 600; letter-spacing: 0.10em; text-transform: uppercase; color: var(--t3); font-family: var(--fM); margin-bottom: 8px; }
+    .path-row { display: flex; gap: 8px; }
+    .path-input {
+      flex: 1; padding: 10px 14px; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 7px; color: var(--t1); font-family: var(--fM); font-size: 12px;
+      outline: none; transition: border-color 150ms;
+    }
+    .path-input:focus { border-color: var(--teal); box-shadow: 0 0 12px rgba(0,245,212,0.10); }
+    .path-input::placeholder { color: var(--t4); }
+    .btn-browse {
+      padding: 10px 16px; background: var(--card); border: 1px solid var(--border);
+      border-radius: 7px; color: var(--t2); font-family: var(--fM); font-size: 11px;
+      cursor: pointer; transition: all 150ms; white-space: nowrap;
+    }
+    .btn-browse:hover { border-color: var(--border-hi); color: var(--t1); background: var(--card-hover); }
+
+    .recent-list { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; max-height: 110px; overflow-y: auto; }
+    .recent-list::-webkit-scrollbar { width: 2px; }
+    .recent-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); }
+    .recent-item {
+      padding: 6px 10px; background: var(--card); border: 1px solid var(--border);
+      border-radius: 5px; font-family: var(--fM); font-size: 10px; color: var(--t2);
+      cursor: pointer; transition: all 140ms; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .recent-item:hover { border-color: var(--teal); color: var(--teal); background: var(--teal-dim); }
+    .recent-empty { font-family: var(--fM); font-size: 10px; color: var(--t4); padding: 6px 0; }
+
+    /* Mode pills */
+    .mode-pills { display: flex; gap: 8px; }
+    .mode-pill {
+      flex: 1; padding: 10px 12px; background: var(--card); border: 1px solid var(--border);
+      border-radius: 8px; cursor: pointer; transition: all 150ms; text-align: center;
+    }
+    .mode-pill:hover { border-color: var(--border-hi); }
+    .mode-pill.active { border-color: rgba(0,245,212,0.4); background: var(--teal-dim); }
+    .mode-pill-name { font-family: var(--fH); font-size: 13px; font-weight: 600; color: var(--t1); margin-bottom: 2px; }
+    .mode-pill.active .mode-pill-name { color: var(--teal); }
+    .mode-pill-desc { font-family: var(--fM); font-size: 9px; color: var(--t3); }
+
+    .btn-start-scan {
+      width: 100%; padding: 12px; background: var(--teal-dim); border: 1px solid rgba(0,245,212,0.32);
+      border-radius: 8px; color: var(--teal); font-family: var(--fH); font-size: 14px; font-weight: 700;
+      letter-spacing: 0.06em; cursor: pointer; transition: all 160ms; margin-top: 4px;
+    }
+    .btn-start-scan:hover { background: rgba(0,245,212,0.18); box-shadow: 0 0 24px var(--teal-glow); }
+    .btn-start-scan:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+
+    /* Progress phase (hidden initially) */
+    .scan-progress { display: none; }
+    .scan-progress.active { display: block; }
+    .scan-setup { display: block; }
+    .scan-setup.hidden { display: none; }
+
     .ag-list { display: flex; flex-direction: column; gap: 8px; }
     .ag-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: var(--card); border: 1px solid var(--border); border-radius: 7px; transition: border-color 250ms; }
     .ag-row.run { border-color: rgba(0,245,212,0.3); }
@@ -332,10 +392,19 @@
     .ag-prog-fill.done { background: var(--green); }
     .ag-st { font-size: 10px; font-family: var(--fM); color: var(--t3); width: 55px; text-align: right; }
     .ag-st.run { color: var(--teal); } .ag-st.done { color: var(--green); }
-    .scan-close { position: absolute; top: 14px; right: 14px; width: 26px; height: 26px; background: var(--card); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 13px; color: var(--t2); transition: all 140ms; }
-    .scan-close:hover { background: var(--card-hover); color: var(--t1); }
-    .scan-log { margin-top: 14px; padding: 10px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; font-family: var(--fM); font-size: 10px; color: var(--t3); height: 75px; overflow-y: auto; line-height: 1.7; }
-    .log-ok { color: var(--green); } .log-info { color: var(--teal); } .log-warn { color: var(--amber); }
+    .scan-log { margin-top: 14px; padding: 10px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; font-family: var(--fM); font-size: 10px; color: var(--t3); height: 140px; overflow-y: auto; line-height: 1.7; }
+    .scan-log::-webkit-scrollbar { width: 2px; }
+    .scan-log::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); }
+    .log-ok { color: var(--green); } .log-info { color: var(--teal); } .log-warn { color: var(--amber); } .log-error { color: var(--red); }
+
+    .btn-view-results {
+      display: none; width: 100%; padding: 12px; margin-top: 14px;
+      background: var(--green-dim); border: 1px solid rgba(48,209,88,0.32);
+      border-radius: 8px; color: var(--green); font-family: var(--fH); font-size: 14px; font-weight: 700;
+      letter-spacing: 0.06em; cursor: pointer; transition: all 160ms;
+    }
+    .btn-view-results:hover { background: rgba(48,209,88,0.18); box-shadow: 0 0 24px var(--green-glow); }
+    .btn-view-results.vis { display: block; animation: vin 320ms ease; }
   </style>
 </head>
 <body>
@@ -527,10 +596,54 @@
 <div id="scan-overlay">
   <div class="scan-modal">
     <div class="scan-close" id="scan-close">✕</div>
-    <div class="sm-title">⬡ RUNNING DEEP SCAN</div>
-    <div class="sm-sub" id="sm-sub">Gathering context · Spawning 5 specialist agents in parallel</div>
-    <div class="ag-list" id="ag-list"></div>
-    <div class="scan-log" id="scan-log"></div>
+
+    <!-- ── SETUP PHASE ── -->
+    <div class="scan-setup" id="scan-setup">
+      <div class="sm-title">⬡ NEW SCAN</div>
+      <div class="sm-sub">Select a project folder and scan mode</div>
+
+      <div class="scan-section">
+        <div class="scan-label">Target Path</div>
+        <div class="path-row">
+          <input type="text" class="path-input" id="scan-path" placeholder="/path/to/your/project">
+          <button class="btn-browse" id="btn-browse">Browse</button>
+          <input type="file" id="folder-picker" webkitdirectory style="display:none">
+        </div>
+        <div class="scan-label" style="margin-top:10px">Recent Projects</div>
+        <div class="recent-list" id="recent-list">
+          <div class="recent-empty">Loading recent projects...</div>
+        </div>
+      </div>
+
+      <div class="scan-section">
+        <div class="scan-label">Scan Mode</div>
+        <div class="mode-pills" id="mode-pills">
+          <div class="mode-pill" data-mode="quick">
+            <div class="mode-pill-name">Quick</div>
+            <div class="mode-pill-desc">2-3 min</div>
+          </div>
+          <div class="mode-pill active" data-mode="deep">
+            <div class="mode-pill-name">Deep</div>
+            <div class="mode-pill-desc">8-15 min</div>
+          </div>
+          <div class="mode-pill" data-mode="security">
+            <div class="mode-pill-name">Security</div>
+            <div class="mode-pill-desc">focused</div>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn-start-scan" id="btn-start-scan">▶ Start Scan</button>
+    </div>
+
+    <!-- ── PROGRESS PHASE ── -->
+    <div class="scan-progress" id="scan-progress">
+      <div class="sm-title" id="sm-prog-title">⬡ RUNNING DEEP SCAN</div>
+      <div class="sm-sub" id="sm-sub">Streaming output from code-audit...</div>
+      <div class="ag-list" id="ag-list"></div>
+      <div class="scan-log" id="scan-log"></div>
+      <button class="btn-view-results" id="btn-view-results">View Results</button>
+    </div>
   </div>
 </div>
 
@@ -806,58 +919,270 @@ function initCost(){
     </tr>`;
 }
 
-// ── SCAN SIMULATION ───────────────────────────────────────────
+// ── SCAN SETUP & REAL SSE ─────────────────────────────────────
+
+// Agent display config for progress UI
 const AGENTS=[
-  {n:'🔑 Secrets Scanner',   m:'regex · deterministic', t:700},
-  {n:'📦 Dependency Scan',   m:'pip-audit · osv-scanner',t:1100},
-  {n:'🔒 Security Agent',    m:'gemini-2.5-flash',       t:3800},
-  {n:'🏗️ Architectural',    m:'gemini-2.5-flash',       t:4100},
-  {n:'⚡ Performance',       m:'kimi-k2.5 · nvidia',     t:3500},
-  {n:'✅ Functional',        m:'llama-4-maverick · nvidia',t:3900},
-  {n:'📐 Maintainability',   m:'llama-4-maverick · nvidia',t:3600},
-  {n:'⚖️ Judge',             m:'kimi-k2.5 · nvidia',     t:2200},
-];
-const LOGS=[
-  {t:'info',m:'Gathering context from 34 source files...'},
-  {t:'ok',  m:'Context ready · 18,420 tokens assembled'},
-  {t:'info',m:'Phase 0: Running secrets scan (regex, $0.00)...'},
-  {t:'warn',m:'2 potential secrets detected in scanners/'},
-  {t:'info',m:'Phase 0.5: Running dependency scan...'},
-  {t:'ok',  m:'No known CVEs in requirements.txt'},
-  {t:'info',m:'Phase 1: Spawning 5 specialist agents in parallel...'},
-  {t:'ok',  m:'Security · 6 findings · 34.2s'},
-  {t:'ok',  m:'Architectural · 4 findings · 31.7s'},
-  {t:'ok',  m:'Performance · 3 findings · 28.4s'},
-  {t:'ok',  m:'Functional · 5 findings · 29.1s'},
-  {t:'ok',  m:'Maintainability · 3 findings · 27.8s'},
-  {t:'info',m:'Phase 2: Judge aggregating 21 findings...'},
-  {t:'ok',  m:'Judge complete · 23 findings after dedup · $0.00'},
-  {t:'ok',  m:'Report saved · .audit/reports/audit_20260402_143022.json'},
+  {n:'🔑 Secrets Scanner',   m:'regex · deterministic'},
+  {n:'📦 Dependency Scan',   m:'pip-audit · osv-scanner'},
+  {n:'🔒 Security Agent',    m:'gemini-2.5-flash'},
+  {n:'🏗️ Architectural',    m:'gemini-2.5-flash'},
+  {n:'⚡ Performance',       m:'kimi-k2.5 · nvidia'},
+  {n:'✅ Functional',        m:'llama-4-maverick · nvidia'},
+  {n:'📐 Maintainability',   m:'llama-4-maverick · nvidia'},
+  {n:'⚖️ Judge',             m:'kimi-k2.5 · nvidia'},
 ];
 
-document.getElementById('btn-run').addEventListener('click',()=>{
-  const ov=document.getElementById('scan-overlay');
-  ov.classList.add('vis');
-  const gl=document.getElementById('ag-list');
-  gl.innerHTML=AGENTS.map((a,i)=>`
-    <div class="ag-row" id="ar${i}">
-      <span class="ag-ic">${a.n.split(' ')[0]}</span>
-      <span class="ag-nm">${a.n.replace(a.n.split(' ')[0]+' ','')}</span>
-      <div class="ag-prog"><div class="ag-prog-fill" id="ap${i}"></div></div>
-      <span class="ag-st" id="as${i}">waiting</span>
-    </div>`).join('');
-  const logEl=document.getElementById('scan-log'); logEl.innerHTML='';
-  let li=0; const li_iv=setInterval(()=>{ if(li>=LOGS.length){clearInterval(li_iv);return;} const l=LOGS[li++]; const d=document.createElement('div'); d.className='log-'+l.t; d.textContent='> '+l.m; logEl.appendChild(d); logEl.scrollTop=logEl.scrollHeight; },650);
-  AGENTS.forEach((a,i)=>{
-    const delay=i<2?i*250:1800+((i-2)*80);
-    setTimeout(()=>{
-      const row=document.getElementById('ar'+i), fill=document.getElementById('ap'+i), st=document.getElementById('as'+i);
-      row.className='ag-row run'; st.className='ag-st run'; st.textContent='running';
-      let p=0; const iv=setInterval(()=>{ p=Math.min(p+(100/(a.t/55)),100); fill.style.width=p+'%'; if(p>=100){clearInterval(iv);fill.className='ag-prog-fill done';st.className='ag-st done';st.textContent='done ✓';row.className='ag-row done';}},55);
-    },delay);
+// Agent keyword matchers for auto-detecting progress from log lines
+const AGENT_KEYWORDS = [
+  ['secret','regex'],
+  ['dependency','pip-audit','osv'],
+  ['security'],
+  ['architect'],
+  ['performance'],
+  ['functional'],
+  ['maintainability'],
+  ['judge','aggregat','dedup'],
+];
+
+let selectedMode = 'deep';
+let currentEventSource = null;
+
+// ── Fetch recent folders on load ──
+async function loadRecentFolders(){
+  const el = document.getElementById('recent-list');
+  try {
+    const res = await fetch('/api/folders/recent');
+    const data = await res.json();
+    if(data.folders && data.folders.length > 0){
+      el.innerHTML = data.folders.map(f =>
+        `<div class="recent-item" data-path="${f}">${f}</div>`
+      ).join('');
+      el.querySelectorAll('.recent-item').forEach(item => {
+        item.addEventListener('click', () => {
+          document.getElementById('scan-path').value = item.dataset.path;
+        });
+      });
+    } else {
+      el.innerHTML = '<div class="recent-empty">No recent projects found</div>';
+    }
+  } catch(e){
+    el.innerHTML = '<div class="recent-empty">Could not load recent projects</div>';
+  }
+}
+loadRecentFolders();
+
+// ── Browse button ──
+document.getElementById('btn-browse').addEventListener('click', () => {
+  document.getElementById('folder-picker').click();
+});
+document.getElementById('folder-picker').addEventListener('change', (e) => {
+  const files = e.target.files;
+  if(files && files.length > 0){
+    // Extract the common path prefix from the webkitRelativePath
+    const rel = files[0].webkitRelativePath;
+    const folderName = rel.split('/')[0];
+    // We can only get the folder name from webkitdirectory, prompt user to confirm
+    const input = document.getElementById('scan-path');
+    if(!input.value){
+      input.value = folderName;
+      input.placeholder = 'Got folder name — enter full absolute path';
+    }
+  }
+});
+
+// ── Mode pills ──
+document.querySelectorAll('.mode-pill').forEach(pill => {
+  pill.addEventListener('click', () => {
+    document.querySelectorAll('.mode-pill').forEach(p => p.classList.remove('active'));
+    pill.classList.add('active');
+    selectedMode = pill.dataset.mode;
   });
 });
-document.getElementById('scan-close').addEventListener('click',()=>document.getElementById('scan-overlay').classList.remove('vis'));
+
+// ── Open overlay (Run Scan button in topbar) ──
+document.getElementById('btn-run').addEventListener('click', () => {
+  const ov = document.getElementById('scan-overlay');
+  // Reset to setup phase
+  document.getElementById('scan-setup').classList.remove('hidden');
+  document.getElementById('scan-progress').classList.remove('active');
+  document.getElementById('btn-view-results').classList.remove('vis');
+  document.getElementById('btn-view-results').style.display = 'none';
+  ov.classList.add('vis');
+});
+
+// ── Close overlay ──
+document.getElementById('scan-close').addEventListener('click', () => {
+  document.getElementById('scan-overlay').classList.remove('vis');
+  if(currentEventSource) { currentEventSource.close(); currentEventSource = null; }
+});
+
+// ── Start Scan ──
+document.getElementById('btn-start-scan').addEventListener('click', async () => {
+  const pathVal = document.getElementById('scan-path').value.trim();
+  if(!pathVal){
+    document.getElementById('scan-path').style.borderColor = 'var(--red)';
+    setTimeout(() => document.getElementById('scan-path').style.borderColor = '', 1500);
+    return;
+  }
+
+  const startBtn = document.getElementById('btn-start-scan');
+  startBtn.disabled = true;
+  startBtn.textContent = 'Starting...';
+
+  try {
+    const res = await fetch('/api/scan', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ path: pathVal, mode: selectedMode }),
+    });
+    const data = await res.json();
+
+    if(!res.ok){
+      alert(data.detail || 'Failed to start scan');
+      startBtn.disabled = false;
+      startBtn.textContent = '▶ Start Scan';
+      return;
+    }
+
+    // Switch to progress phase
+    document.getElementById('scan-setup').classList.add('hidden');
+    document.getElementById('scan-progress').classList.add('active');
+
+    const modeLabel = selectedMode.charAt(0).toUpperCase() + selectedMode.slice(1);
+    document.getElementById('sm-prog-title').textContent = `⬡ RUNNING ${modeLabel.toUpperCase()} SCAN`;
+    document.getElementById('sm-sub').textContent = `Scanning ${pathVal} · mode: ${selectedMode}`;
+
+    // Build agent progress rows
+    const gl = document.getElementById('ag-list');
+    gl.innerHTML = AGENTS.map((a,i) => `
+      <div class="ag-row" id="ar${i}">
+        <span class="ag-ic">${a.n.split(' ')[0]}</span>
+        <span class="ag-nm">${a.n.replace(a.n.split(' ')[0]+' ','')}</span>
+        <div class="ag-prog"><div class="ag-prog-fill" id="ap${i}"></div></div>
+        <span class="ag-st" id="as${i}">waiting</span>
+      </div>`).join('');
+
+    const logEl = document.getElementById('scan-log');
+    logEl.innerHTML = '';
+
+    // Helper: add a log line
+    function addLog(text, cls){
+      const d = document.createElement('div');
+      d.className = cls || 'log-info';
+      d.textContent = '> ' + text;
+      logEl.appendChild(d);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    // Helper: try to match log line to agent and update progress
+    function matchAgent(line){
+      const lower = line.toLowerCase();
+      AGENT_KEYWORDS.forEach((keywords, i) => {
+        const running = keywords.some(k => lower.includes(k));
+        if(running){
+          const row = document.getElementById('ar'+i);
+          const fill = document.getElementById('ap'+i);
+          const st = document.getElementById('as'+i);
+          if(st.textContent === 'waiting'){
+            row.className = 'ag-row run';
+            st.className = 'ag-st run';
+            st.textContent = 'running';
+          }
+          // If line contains "finding" or "complete" or "done", mark done
+          if(lower.includes('finding') || lower.includes('complete') || lower.includes('done') || lower.includes('saved')){
+            fill.style.width = '100%';
+            fill.className = 'ag-prog-fill done';
+            st.className = 'ag-st done';
+            st.textContent = 'done ✓';
+            row.className = 'ag-row done';
+          } else {
+            // Increment progress
+            const cur = parseFloat(fill.style.width) || 0;
+            fill.style.width = Math.min(cur + 15, 90) + '%';
+          }
+        }
+      });
+    }
+
+    addLog('Scan started (id: ' + data.scan_id + ')', 'log-info');
+
+    // Connect to SSE stream
+    const evtSource = new EventSource('/api/scan/' + data.scan_id + '/stream');
+    currentEventSource = evtSource;
+
+    evtSource.addEventListener('log', (e) => {
+      const payload = JSON.parse(e.data);
+      addLog(payload.line, 'log-ok');
+      matchAgent(payload.line);
+    });
+
+    evtSource.addEventListener('error', (e) => {
+      if(e.data){
+        const payload = JSON.parse(e.data);
+        addLog(payload.line, 'log-error');
+      }
+    });
+
+    evtSource.addEventListener('done', (e) => {
+      const payload = JSON.parse(e.data);
+      evtSource.close();
+      currentEventSource = null;
+
+      // Mark all agents as done
+      AGENTS.forEach((_, i) => {
+        const fill = document.getElementById('ap'+i);
+        const st = document.getElementById('as'+i);
+        const row = document.getElementById('ar'+i);
+        fill.style.width = '100%';
+        fill.className = 'ag-prog-fill done';
+        st.className = 'ag-st done';
+        st.textContent = 'done ✓';
+        row.className = 'ag-row done';
+      });
+
+      if(payload.exit_code === 0){
+        addLog('Scan completed successfully!', 'log-ok');
+      } else {
+        addLog('Scan finished with exit code: ' + payload.exit_code, 'log-warn');
+      }
+
+      // Show "View Results" button
+      const vr = document.getElementById('btn-view-results');
+      vr.style.display = 'block';
+      vr.classList.add('vis');
+    });
+
+    evtSource.onerror = () => {
+      if(evtSource.readyState === EventSource.CLOSED) return;
+      addLog('SSE connection error — retrying...', 'log-warn');
+    };
+
+  } catch(err){
+    alert('Error starting scan: ' + err.message);
+  } finally {
+    startBtn.disabled = false;
+    startBtn.textContent = '▶ Start Scan';
+  }
+});
+
+// ── View Results button ──
+document.getElementById('btn-view-results').addEventListener('click', () => {
+  // Close overlay
+  document.getElementById('scan-overlay').classList.remove('vis');
+  if(currentEventSource) { currentEventSource.close(); currentEventSource = null; }
+
+  // Switch to Overview view
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelector('[data-view="overview"]').classList.add('active');
+  document.getElementById('view-overview').classList.add('active');
+
+  // Reload dashboard data
+  // Re-fetch from API if available, otherwise re-init with current data
+  initOverview();
+  renderFFC();
+});
 
 // ── BOOT ──────────────────────────────────────────────────────
 initOverview();
