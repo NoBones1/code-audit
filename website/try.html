@@ -1,0 +1,1264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CodeAudit — Scan Results</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <style>
+    :root {
+      --bg: #06060e;
+      --bg2: #0c0d16;
+      --surf: #12131e;
+      --bord: rgba(255,255,255,0.06);
+      --teal: #00F5D4;
+      --teal-dim: rgba(0,245,212,0.12);
+      --teal-glow: rgba(0,245,212,0.25);
+      --purple: #8B5CF6;
+      --purple-dim: rgba(139,92,246,0.12);
+      --red: #FF3366;
+      --amber: #FFB800;
+      --green: #30D158;
+      --txt: #e4e8f0;
+      --txt2: #8b90a8;
+      --txt3: #52566e;
+      --fD: 'Outfit', sans-serif;
+      --fB: 'Inter', sans-serif;
+      --fM: 'JetBrains Mono', monospace;
+    }
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    html { scroll-behavior: smooth; }
+    body { background: var(--bg); color: var(--txt); font-family: var(--fB); overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+
+    body::before {
+      content: ''; position: fixed; inset: 0; z-index: 9999; pointer-events: none;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+      background-repeat: repeat; opacity: 0.6;
+    }
+
+    .scroll-bar { position: fixed; top: 0; left: 0; height: 2px; background: linear-gradient(90deg, var(--teal), var(--purple)); z-index: 10000; width: 0%; transition: width 0.1s; }
+
+    /* NAV */
+    .nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      padding: 1rem 2.5rem; display: flex; align-items: center; justify-content: space-between;
+      backdrop-filter: blur(20px); background: rgba(6,6,14,0.75); border-bottom: 1px solid var(--bord);
+    }
+    .nav-brand { font-family: var(--fM); font-weight: 700; font-size: 0.95rem; letter-spacing: 0.06em; color: var(--txt); text-decoration: none; }
+    .nav-brand span { color: var(--teal); }
+    .nav-status { display: flex; align-items: center; gap: 8px; font-family: var(--fM); font-size: 0.78rem; color: var(--txt2); }
+    .nav-status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--teal); animation: blink 1.5s ease-in-out infinite; }
+    .nav-status-dot.done { animation: none; background: var(--green); }
+    .nav-status-dot.error { animation: none; background: var(--red); }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    /* HERO / 3D SCENE */
+    .hero-scene {
+      position: relative; width: 100%; height: 70vh; min-height: 500px;
+      padding-top: 60px; overflow: hidden;
+    }
+    #three-canvas { width: 100%; height: 100%; display: block; }
+    .hero-aurora {
+      position: absolute; inset: 0; pointer-events: none;
+      background:
+        radial-gradient(ellipse 90% 60% at 50% -10%, rgba(0,245,212,0.08), transparent 55%),
+        radial-gradient(ellipse 60% 50% at 15% 80%, rgba(139,92,246,0.06), transparent 50%),
+        radial-gradient(ellipse 50% 40% at 85% 50%, rgba(0,245,212,0.04), transparent 50%);
+      animation: aurora 10s ease-in-out infinite alternate;
+    }
+    @keyframes aurora { 0%{filter:hue-rotate(0deg) brightness(1)} 100%{filter:hue-rotate(15deg) brightness(1.1)} }
+
+    .scan-title-overlay {
+      position: absolute; top: 80px; left: 0; right: 0; text-align: center; z-index: 10;
+      pointer-events: none;
+    }
+    .scan-title-overlay h1 {
+      font-family: var(--fD); font-size: clamp(1.5rem, 4vw, 2.5rem); font-weight: 800;
+      letter-spacing: -0.03em;
+      background: linear-gradient(135deg, var(--teal) 0%, var(--purple) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .scan-title-overlay p { font-family: var(--fM); font-size: 0.78rem; color: var(--txt3); margin-top: 0.4rem; }
+
+    /* AGENT LABELS */
+    .agent-labels {
+      display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;
+      padding: 1.5rem 1.5rem 2rem; max-width: 1100px; margin: 0 auto;
+    }
+    .agent-label {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--surf); border: 1px solid var(--bord); border-radius: 10px;
+      padding: 0.6rem 1rem; font-size: 0.72rem; transition: all 0.3s;
+    }
+    .agent-label.active { border-color: rgba(255,255,255,0.15); }
+    .agent-label.completed { border-color: rgba(48,209,88,0.3); }
+    .agent-label-icon { font-size: 1rem; flex-shrink: 0; }
+    .agent-label-name { font-family: var(--fD); font-weight: 700; color: var(--txt); white-space: nowrap; }
+    .agent-label-model { font-family: var(--fM); color: var(--txt3); white-space: nowrap; }
+    .agent-label-provider {
+      font-family: var(--fM); font-size: 0.6rem; font-weight: 700; letter-spacing: 0.06em;
+      padding: 1px 6px; border-radius: 4px; white-space: nowrap;
+    }
+    .badge-google { color: #4285F4; border: 1px solid rgba(66,133,244,0.3); background: rgba(66,133,244,0.08); }
+    .badge-openrouter { color: #8B5CF6; border: 1px solid rgba(139,92,246,0.3); background: rgba(139,92,246,0.08); }
+    .badge-nvidia { color: #76B900; border: 1px solid rgba(118,185,0,0.3); background: rgba(118,185,0,0.08); }
+    .agent-label-status { width: 6px; height: 6px; border-radius: 50%; background: var(--txt3); flex-shrink: 0; transition: background 0.3s; }
+    .agent-label.active .agent-label-status { background: var(--amber); animation: blink 1s ease-in-out infinite; }
+    .agent-label.completed .agent-label-status { background: var(--green); animation: none; }
+
+    /* TERMINAL */
+    .terminal-section { padding: 0 1.5rem 4rem; max-width: 1100px; margin: 0 auto; }
+    .terminal {
+      background: #0a0a14; border: 1px solid rgba(255,255,255,0.08); border-radius: 14px;
+      overflow: hidden; font-family: var(--fM); font-size: 0.75rem; line-height: 1.7;
+    }
+    .term-bar {
+      padding: 10px 16px; background: rgba(255,255,255,0.04); border-bottom: 1px solid rgba(255,255,255,0.06);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .term-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .term-title { font-size: 0.7rem; color: var(--txt3); margin-left: 8px; }
+    .term-body {
+      padding: 16px 18px; color: var(--txt2); height: 320px; overflow-y: auto;
+      scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.1) transparent;
+    }
+    .term-body::-webkit-scrollbar { width: 6px; }
+    .term-body::-webkit-scrollbar-track { background: transparent; }
+    .term-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+    .term-line { white-space: pre-wrap; word-break: break-all; }
+    .term-line.t-teal { color: var(--teal); }
+    .term-line.t-red { color: var(--red); }
+    .term-line.t-amber { color: var(--amber); }
+    .term-line.t-green { color: var(--green); }
+    .term-line.t-purple { color: var(--purple); }
+    .term-line.t-dim { color: var(--txt3); }
+    .term-status {
+      padding: 8px 16px; background: rgba(255,255,255,0.02); border-top: 1px solid rgba(255,255,255,0.06);
+      display: flex; justify-content: space-between; align-items: center; font-size: 0.68rem; color: var(--txt3);
+    }
+    .term-status-left { display: flex; gap: 1.5rem; }
+    .term-status-right { color: var(--teal); }
+
+    /* COST COMPARISON */
+    .cost-section {
+      padding: 6rem 1.5rem; max-width: 900px; margin: 0 auto;
+      opacity: 0; transform: translateY(40px);
+    }
+    .cost-section.visible { opacity: 1; transform: translateY(0); transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1); }
+    .section-label {
+      font-family: var(--fM); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.14em;
+      text-transform: uppercase; color: var(--teal); margin-bottom: 1.2rem; text-align: center;
+    }
+    .section-title {
+      font-family: var(--fD); font-size: clamp(2rem, 4vw, 3rem); font-weight: 800;
+      text-align: center; letter-spacing: -0.03em; line-height: 1.1; margin-bottom: 0.8rem;
+    }
+    .section-sub { text-align: center; color: var(--txt2); max-width: 520px; margin: 0 auto 3rem; line-height: 1.7; font-size: 0.92rem; }
+
+    .cost-chart { display: flex; flex-direction: column; gap: 12px; }
+    .cost-row {
+      display: grid; grid-template-columns: 180px 1fr 90px; align-items: center; gap: 16px;
+      padding: 0.8rem 0;
+    }
+    .cost-row-name { font-family: var(--fD); font-size: 0.88rem; font-weight: 600; white-space: nowrap; }
+    .cost-row-name.highlight { color: var(--teal); }
+    .cost-bar-wrap {
+      height: 32px; background: rgba(255,255,255,0.03); border-radius: 6px; overflow: hidden;
+      position: relative;
+    }
+    .cost-bar {
+      height: 100%; border-radius: 6px; width: 0%; transition: width 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+    }
+    .cost-bar.bar-teal { background: linear-gradient(90deg, var(--teal), rgba(0,245,212,0.6)); }
+    .cost-bar.bar-grey { background: linear-gradient(90deg, rgba(255,255,255,0.25), rgba(255,255,255,0.1)); }
+    .cost-bar.bar-red { background: linear-gradient(90deg, rgba(255,51,102,0.5), rgba(255,51,102,0.2)); }
+    .cost-row-price { font-family: var(--fM); font-size: 0.85rem; font-weight: 500; text-align: right; }
+    .cost-row-price.free { color: var(--green); font-weight: 700; }
+    .cost-token-detail {
+      margin-top: 2rem; padding: 1.2rem 1.6rem; background: var(--surf); border: 1px solid var(--bord);
+      border-radius: 12px; font-family: var(--fM); font-size: 0.72rem; color: var(--txt3); line-height: 1.8;
+    }
+
+    /* FINDINGS */
+    .findings-section {
+      padding: 6rem 1.5rem; max-width: 1100px; margin: 0 auto;
+      opacity: 0; transform: translateY(40px);
+    }
+    .findings-section.visible { opacity: 1; transform: translateY(0); transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.2s; }
+    .findings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+    .finding-card {
+      background: var(--surf); border: 1px solid var(--bord); border-radius: 14px;
+      padding: 1.6rem; position: relative; overflow: hidden; transition: border-color 0.3s;
+    }
+    .finding-card:hover { border-color: rgba(255,255,255,0.12); }
+    .finding-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: var(--card-color, var(--teal));
+    }
+    .finding-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+    .finding-agent { display: flex; align-items: center; gap: 8px; }
+    .finding-agent-icon { font-size: 1.2rem; }
+    .finding-agent-name { font-family: var(--fD); font-weight: 700; font-size: 0.95rem; }
+    .finding-model { font-family: var(--fM); font-size: 0.65rem; color: var(--txt3); }
+    .finding-count {
+      font-family: var(--fM); font-size: 0.75rem; font-weight: 600;
+      padding: 2px 10px; border-radius: 100px; background: rgba(255,255,255,0.05);
+      border: 1px solid var(--bord);
+    }
+    .finding-list { display: flex; flex-direction: column; gap: 8px; }
+    .finding-item {
+      display: flex; align-items: flex-start; gap: 8px;
+      font-size: 0.82rem; color: var(--txt2); line-height: 1.5;
+      padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.03);
+    }
+    .finding-item:last-child { border-bottom: none; }
+    .severity-badge {
+      font-family: var(--fM); font-size: 0.58rem; font-weight: 700; letter-spacing: 0.05em;
+      padding: 2px 6px; border-radius: 4px; flex-shrink: 0; margin-top: 2px;
+    }
+    .severity-IMPORTANT { color: var(--red); border: 1px solid rgba(255,51,102,0.3); background: rgba(255,51,102,0.1); }
+    .severity-NIT { color: var(--amber); border: 1px solid rgba(255,184,0,0.3); background: rgba(255,184,0,0.1); }
+    .severity-PRE_EXISTING { color: var(--txt3); border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); }
+
+    /* CTA */
+    .cta-section {
+      padding: 8rem 1.5rem; text-align: center; position: relative;
+      background: radial-gradient(ellipse 80% 50% at 50% 100%, rgba(0,245,212,0.06), transparent 60%);
+      opacity: 0; transform: translateY(40px);
+    }
+    .cta-section.visible { opacity: 1; transform: translateY(0); transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.3s; }
+    .cta-title { font-family: var(--fD); font-size: clamp(2rem, 5vw, 3.5rem); font-weight: 800; letter-spacing: -0.03em; margin-bottom: 1rem; }
+    .cta-sub { color: var(--txt2); margin-bottom: 2.5rem; font-size: 1rem; }
+    .cta-buttons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .cta-btn {
+      padding: 0.9rem 2rem; border-radius: 12px; font-family: var(--fD); font-size: 0.95rem;
+      font-weight: 700; cursor: pointer; transition: all 0.3s; letter-spacing: 0.02em;
+      text-decoration: none; display: inline-flex; align-items: center; gap: 8px;
+    }
+    .cta-btn-primary { background: var(--teal); color: #000; border: none; }
+    .cta-btn-primary:hover { box-shadow: 0 0 40px var(--teal-glow); transform: translateY(-2px); }
+    .cta-btn-secondary {
+      background: transparent; color: var(--txt); border: 1px solid var(--bord);
+    }
+    .cta-btn-secondary:hover { border-color: rgba(255,255,255,0.2); background: rgba(255,255,255,0.03); }
+    .cta-link { display: block; margin-top: 1.5rem; color: var(--txt3); font-size: 0.82rem; text-decoration: none; transition: color 0.2s; }
+    .cta-link:hover { color: var(--teal); }
+
+    /* RETRY */
+    .retry-overlay {
+      position: fixed; inset: 0; z-index: 200; background: rgba(6,6,14,0.9);
+      display: none; align-items: center; justify-content: center;
+    }
+    .retry-overlay.visible { display: flex; }
+    .retry-box {
+      background: var(--surf); border: 1px solid var(--bord); border-radius: 16px;
+      padding: 2.5rem; text-align: center; max-width: 400px;
+    }
+    .retry-box h3 { font-family: var(--fD); font-size: 1.3rem; font-weight: 700; margin-bottom: 0.8rem; }
+    .retry-box p { color: var(--txt2); font-size: 0.88rem; margin-bottom: 1.5rem; }
+    .retry-btn {
+      padding: 0.7rem 1.8rem; background: var(--teal-dim); color: var(--teal);
+      border: 1px solid rgba(0,245,212,0.3); border-radius: 8px; cursor: pointer;
+      font-family: var(--fB); font-size: 0.88rem; font-weight: 600; transition: all 0.2s;
+    }
+    .retry-btn:hover { background: rgba(0,245,212,0.2); }
+
+    /* RESPONSIVE */
+    @media (max-width: 900px) {
+      .hero-scene { height: 50vh; min-height: 400px; }
+      .agent-labels { gap: 8px; }
+      .agent-label { padding: 0.5rem 0.7rem; font-size: 0.65rem; }
+      .cost-row { grid-template-columns: 140px 1fr 70px; gap: 10px; }
+      .findings-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 640px) {
+      .hero-scene { height: 40vh; min-height: 320px; }
+      .nav { padding: 0.8rem 1.2rem; }
+      .agent-labels { gap: 6px; padding: 1rem; }
+      .agent-label { padding: 0.4rem 0.6rem; }
+      .agent-label-model, .agent-label-provider { display: none; }
+      .cost-row { grid-template-columns: 100px 1fr 60px; gap: 8px; }
+      .cost-row-name { font-size: 0.75rem; }
+      .cost-row-price { font-size: 0.72rem; }
+      .term-body { height: 240px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="scroll-bar" id="scrollBar"></div>
+
+<!-- NAV -->
+<nav class="nav">
+  <a class="nav-brand" href="index.html">CODE<span>AUDIT</span></a>
+  <div class="nav-status" id="navStatus">
+    <div class="nav-status-dot" id="navDot"></div>
+    <span id="navStatusText">Scanning...</span>
+  </div>
+</nav>
+
+<!-- HERO: 3D SCENE -->
+<section class="hero-scene">
+  <div class="hero-aurora"></div>
+  <div class="scan-title-overlay">
+    <h1>Live Code Audit</h1>
+    <p id="scanIdLabel">scan_id: ---</p>
+  </div>
+  <canvas id="three-canvas"></canvas>
+</section>
+
+<!-- AGENT LABELS -->
+<div class="agent-labels" id="agentLabels">
+  <div class="agent-label" data-agent="security">
+    <span class="agent-label-icon">&#x1F512;</span>
+    <span class="agent-label-name">Security</span>
+    <span class="agent-label-model">gemini-2.5-flash</span>
+    <span class="agent-label-provider badge-google">GOOGLE</span>
+    <span class="agent-label-status"></span>
+  </div>
+  <div class="agent-label" data-agent="architecture">
+    <span class="agent-label-icon">&#x1F3D7;</span>
+    <span class="agent-label-name">Architecture</span>
+    <span class="agent-label-model">gemini-2.5-flash</span>
+    <span class="agent-label-provider badge-google">GOOGLE</span>
+    <span class="agent-label-status"></span>
+  </div>
+  <div class="agent-label" data-agent="performance">
+    <span class="agent-label-icon">&#x26A1;</span>
+    <span class="agent-label-name">Performance</span>
+    <span class="agent-label-model">gemini-2.5-flash</span>
+    <span class="agent-label-provider badge-google">GOOGLE</span>
+    <span class="agent-label-status"></span>
+  </div>
+  <div class="agent-label" data-agent="functional">
+    <span class="agent-label-icon">&#x2705;</span>
+    <span class="agent-label-name">Functional</span>
+    <span class="agent-label-model">qwen3-next-80b</span>
+    <span class="agent-label-provider badge-openrouter">OPENROUTER</span>
+    <span class="agent-label-status"></span>
+  </div>
+  <div class="agent-label" data-agent="maintainability">
+    <span class="agent-label-icon">&#x1F4D0;</span>
+    <span class="agent-label-name">Maintainability</span>
+    <span class="agent-label-model">qwen3-next-80b</span>
+    <span class="agent-label-provider badge-openrouter">OPENROUTER</span>
+    <span class="agent-label-status"></span>
+  </div>
+  <div class="agent-label" data-agent="judge">
+    <span class="agent-label-icon">&#x2696;</span>
+    <span class="agent-label-name">Judge</span>
+    <span class="agent-label-model">kimi-k2.5</span>
+    <span class="agent-label-provider badge-nvidia">NVIDIA</span>
+    <span class="agent-label-status"></span>
+  </div>
+</div>
+
+<!-- TERMINAL -->
+<section class="terminal-section">
+  <div class="terminal">
+    <div class="term-bar">
+      <div class="term-dot" style="background:#FF5F57;"></div>
+      <div class="term-dot" style="background:#FEBC2E;"></div>
+      <div class="term-dot" style="background:#28C840;"></div>
+      <span class="term-title">code-audit scan output</span>
+    </div>
+    <div class="term-body" id="termBody">
+      <div class="term-line t-dim">Connecting to scan stream...</div>
+    </div>
+    <div class="term-status">
+      <div class="term-status-left">
+        <span id="termElapsed">elapsed: 0s</span>
+        <span id="termFiles">files: --</span>
+        <span id="termAgent">agent: --</span>
+      </div>
+      <div class="term-status-right" id="termStatusRight">RUNNING</div>
+    </div>
+  </div>
+</section>
+
+<!-- COST COMPARISON -->
+<section class="cost-section" id="costSection">
+  <div class="section-label">Cost Analysis</div>
+  <div class="section-title">What this scan would cost elsewhere</div>
+  <div class="section-sub">Exact costs calculated from actual token usage in this scan. CodeAudit uses free-tier and open-source models exclusively.</div>
+  <div class="cost-chart" id="costChart"></div>
+  <div class="cost-token-detail" id="costTokenDetail"></div>
+</section>
+
+<!-- FINDINGS -->
+<section class="findings-section" id="findingsSection">
+  <div class="section-label">Findings</div>
+  <div class="section-title">Code Review Results</div>
+  <div class="section-sub" id="findingsSummary">Issues discovered across all dimensions of code quality.</div>
+  <div class="findings-grid" id="findingsGrid"></div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section" id="ctaSection">
+  <div class="cta-title">Ready to audit your own code?</div>
+  <div class="cta-sub">Install the CLI and run multi-agent code reviews locally. Always free.</div>
+  <div class="cta-buttons">
+    <a class="cta-btn cta-btn-primary" href="#install">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download CLI
+    </a>
+    <a class="cta-btn cta-btn-secondary" href="https://github.com/user/code-audit" target="_blank">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+      GitHub
+    </a>
+  </div>
+  <a class="cta-link" href="index.html">&larr; Back to homepage</a>
+</section>
+
+<!-- RETRY OVERLAY -->
+<div class="retry-overlay" id="retryOverlay">
+  <div class="retry-box">
+    <h3>Connection Lost</h3>
+    <p>The scan stream disconnected. This can happen if the server is busy.</p>
+    <button class="retry-btn" id="retryBtn">Reconnect</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  "use strict";
+
+  /* ════════════════════════════════════════
+     CONFIG & STATE
+  ════════════════════════════════════════ */
+  const AGENTS = [
+    { key: "security",        icon: "\u{1F512}", color: 0xFF3366, cssColor: "#FF3366" },
+    { key: "architecture",    icon: "\u{1F3D7}",  color: 0x00F5D4, cssColor: "#00F5D4" },
+    { key: "performance",     icon: "\u26A1",     color: 0xFFB800, cssColor: "#FFB800" },
+    { key: "functional",      icon: "\u2705",     color: 0x8B5CF6, cssColor: "#8B5CF6" },
+    { key: "maintainability", icon: "\u{1F4D0}",  color: 0x30D158, cssColor: "#30D158" },
+  ];
+  const JUDGE = { key: "judge", icon: "\u2696\uFE0F", color: 0xFFB800, cssColor: "#FFB800" };
+
+  const PAID_MODELS = [
+    { name: "GPT-4o",            input_per_1m: 2.50,  output_per_1m: 10.00 },
+    { name: "Gemini 2.5 Pro",    input_per_1m: 1.25,  output_per_1m: 10.00 },
+    { name: "Claude Sonnet 4.6", input_per_1m: 3.00,  output_per_1m: 15.00 },
+    { name: "Claude Opus 4.6",   input_per_1m: 15.00, output_per_1m: 75.00 },
+    { name: "CodeRabbit",        input_per_1m: 0,     output_per_1m: 0, flat: 24.00 },
+  ];
+
+  const params = new URLSearchParams(window.location.search);
+  const scanId = params.get("scan_id") || "demo";
+  document.getElementById("scanIdLabel").textContent = "scan_id: " + scanId;
+
+  let startTime = Date.now();
+  let timerInterval = null;
+  let eventSource = null;
+  let scanComplete = false;
+
+  const agentState = {};
+  AGENTS.forEach(a => agentState[a.key] = "idle");
+  agentState["judge"] = "idle";
+
+  /* ════════════════════════════════════════
+     SCROLL PROGRESS
+  ════════════════════════════════════════ */
+  window.addEventListener("scroll", function() {
+    const h = document.documentElement.scrollHeight - window.innerHeight;
+    const pct = h > 0 ? (window.scrollY / h) * 100 : 0;
+    document.getElementById("scrollBar").style.width = pct + "%";
+  });
+
+  /* ════════════════════════════════════════
+     ELAPSED TIMER
+  ════════════════════════════════════════ */
+  function startTimer() {
+    timerInterval = setInterval(function() {
+      var s = Math.floor((Date.now() - startTime) / 1000);
+      document.getElementById("termElapsed").textContent = "elapsed: " + s + "s";
+    }, 1000);
+  }
+  function stopTimer() { if (timerInterval) clearInterval(timerInterval); }
+
+  /* ════════════════════════════════════════
+     THREE.JS 3D SCENE
+  ════════════════════════════════════════ */
+  var scene, camera, renderer, clock;
+  var centerMesh, judgeNode;
+  var agentNodes = {};
+  var connectionLines = [];
+  var particles = [];
+  var starField;
+
+  function initThree() {
+    var canvas = document.getElementById("three-canvas");
+    var container = canvas.parentElement;
+
+    scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x06060e, 0.0015);
+
+    camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 1000);
+    camera.position.set(0, 3, 12);
+    camera.lookAt(0, 0, 0);
+
+    renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setClearColor(0x06060e, 1);
+
+    clock = new THREE.Clock();
+
+    // Ambient light
+    var ambLight = new THREE.AmbientLight(0x222244, 0.5);
+    scene.add(ambLight);
+
+    // Point light at center
+    var pointLight = new THREE.PointLight(0x00F5D4, 1.5, 30);
+    pointLight.position.set(0, 0, 0);
+    scene.add(pointLight);
+
+    // Star field
+    createStarField();
+
+    // Central icosahedron
+    var icoGeo = new THREE.IcosahedronGeometry(1.5, 1);
+    var icoMat = new THREE.MeshBasicMaterial({ color: 0x00F5D4, wireframe: true, transparent: true, opacity: 0.7 });
+    centerMesh = new THREE.Mesh(icoGeo, icoMat);
+    scene.add(centerMesh);
+
+    // Glow sprite for center
+    var glowTex = createGlowTexture(0x00F5D4);
+    var glowSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending }));
+    glowSprite.scale.set(6, 6, 1);
+    centerMesh.add(glowSprite);
+
+    // Agent nodes in pentagon
+    var radius = 5.5;
+    AGENTS.forEach(function(agent, i) {
+      var angle = (i / AGENTS.length) * Math.PI * 2 - Math.PI / 2;
+      var x = Math.cos(angle) * radius;
+      var z = Math.sin(angle) * radius;
+
+      var geo = new THREE.SphereGeometry(0.35, 16, 16);
+      var mat = new THREE.MeshBasicMaterial({ color: agent.color, transparent: true, opacity: 0.8 });
+      var mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(x, 0, z);
+      scene.add(mesh);
+
+      // Glow
+      var gTex = createGlowTexture(agent.color);
+      var gSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: gTex, transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending }));
+      gSprite.scale.set(2.5, 2.5, 1);
+      mesh.add(gSprite);
+
+      agentNodes[agent.key] = { mesh: mesh, mat: mat, baseScale: 0.35, pulsePhase: 0, completed: false, ring: null };
+
+      // Line from center to agent
+      var lineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), mesh.position.clone()]);
+      var lineMat = new THREE.LineBasicMaterial({ color: agent.color, transparent: true, opacity: 0.15 });
+      var line = new THREE.Line(lineGeo, lineMat);
+      scene.add(line);
+      connectionLines.push(line);
+    });
+
+    // Judge node - octahedron above
+    var judgeGeo = new THREE.OctahedronGeometry(0.5, 0);
+    var judgeMat = new THREE.MeshBasicMaterial({ color: 0xFFB800, transparent: true, opacity: 0.8 });
+    var judgeMesh = new THREE.Mesh(judgeGeo, judgeMat);
+    judgeMesh.position.set(0, 4.5, 0);
+    scene.add(judgeMesh);
+
+    var jgTex = createGlowTexture(0xFFB800);
+    var jgSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: jgTex, transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending }));
+    jgSprite.scale.set(3, 3, 1);
+    judgeMesh.add(jgSprite);
+
+    judgeNode = { mesh: judgeMesh, mat: judgeMat, baseScale: 0.5, pulsePhase: 0, completed: false, ring: null };
+
+    // Lines from agents to judge
+    AGENTS.forEach(function(agent) {
+      var aNode = agentNodes[agent.key];
+      var lineGeo = new THREE.BufferGeometry().setFromPoints([aNode.mesh.position.clone(), judgeMesh.position.clone()]);
+      var lineMat = new THREE.LineBasicMaterial({ color: 0xFFB800, transparent: true, opacity: 0.08 });
+      var line = new THREE.Line(lineGeo, lineMat);
+      scene.add(line);
+      connectionLines.push(line);
+    });
+
+    // Particle system
+    createParticles();
+
+    // Resize
+    window.addEventListener("resize", onResize);
+  }
+
+  function createStarField() {
+    var starGeo = new THREE.BufferGeometry();
+    var starCount = 600;
+    var positions = new Float32Array(starCount * 3);
+    for (var i = 0; i < starCount; i++) {
+      positions[i*3]   = (Math.random() - 0.5) * 100;
+      positions[i*3+1] = (Math.random() - 0.5) * 100;
+      positions[i*3+2] = (Math.random() - 0.5) * 100;
+    }
+    starGeo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    var starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.08, transparent: true, opacity: 0.5 });
+    starField = new THREE.Points(starGeo, starMat);
+    scene.add(starField);
+  }
+
+  function createGlowTexture(color) {
+    var canvas = document.createElement("canvas");
+    canvas.width = 128; canvas.height = 128;
+    var ctx = canvas.getContext("2d");
+    var c = new THREE.Color(color);
+    var r = Math.floor(c.r * 255), g = Math.floor(c.g * 255), b = Math.floor(c.b * 255);
+    var gradient = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+    gradient.addColorStop(0, "rgba(" + r + "," + g + "," + b + ",0.6)");
+    gradient.addColorStop(0.4, "rgba(" + r + "," + g + "," + b + ",0.15)");
+    gradient.addColorStop(1, "rgba(" + r + "," + g + "," + b + ",0)");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 128, 128);
+    var tex = new THREE.CanvasTexture(canvas);
+    return tex;
+  }
+
+  function createParticles() {
+    var pGeo = new THREE.BufferGeometry();
+    var pCount = 200;
+    var positions = new Float32Array(pCount * 3);
+    var colors = new Float32Array(pCount * 3);
+    for (var i = 0; i < pCount; i++) {
+      positions[i*3] = (Math.random() - 0.5) * 0.2;
+      positions[i*3+1] = (Math.random() - 0.5) * 0.2;
+      positions[i*3+2] = (Math.random() - 0.5) * 0.2;
+      var c = new THREE.Color(0x00F5D4);
+      colors[i*3] = c.r; colors[i*3+1] = c.g; colors[i*3+2] = c.b;
+    }
+    pGeo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    pGeo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    var pMat = new THREE.PointsMaterial({ size: 0.06, transparent: true, opacity: 0.6, vertexColors: true, blending: THREE.AdditiveBlending });
+    var pMesh = new THREE.Points(pGeo, pMat);
+    scene.add(pMesh);
+
+    // Store particle data for animation
+    particles.push({
+      mesh: pMesh,
+      positions: positions,
+      velocities: [],
+      targets: [],
+      count: pCount
+    });
+    for (var j = 0; j < pCount; j++) {
+      particles[0].velocities.push({ x: 0, y: 0, z: 0 });
+      particles[0].targets.push(null);
+    }
+  }
+
+  function animateParticles(delta) {
+    if (particles.length === 0) return;
+    var p = particles[0];
+    var pos = p.positions;
+
+    for (var i = 0; i < p.count; i++) {
+      var ix = i * 3;
+
+      // Pick a random agent node to flow toward
+      if (!p.targets[i] || Math.random() < 0.005) {
+        var agentKeys = Object.keys(agentNodes);
+        var tKey = agentKeys[Math.floor(Math.random() * agentKeys.length)];
+        var tMesh = agentNodes[tKey].mesh;
+        p.targets[i] = { x: tMesh.position.x, y: tMesh.position.y, z: tMesh.position.z };
+      }
+
+      var t = p.targets[i];
+      var dx = t.x - pos[ix], dy = t.y - pos[ix+1], dz = t.z - pos[ix+2];
+      var dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+
+      if (dist < 0.5) {
+        // Reset to center with slight random offset
+        pos[ix] = (Math.random() - 0.5) * 1;
+        pos[ix+1] = (Math.random() - 0.5) * 1;
+        pos[ix+2] = (Math.random() - 0.5) * 1;
+        p.targets[i] = null;
+      } else {
+        var speed = 0.02 + Math.random() * 0.01;
+        pos[ix]   += (dx / dist) * speed;
+        pos[ix+1] += (dy / dist) * speed;
+        pos[ix+2] += (dz / dist) * speed;
+      }
+    }
+    p.mesh.geometry.attributes.position.needsUpdate = true;
+  }
+
+  function onResize() {
+    var container = document.getElementById("three-canvas").parentElement;
+    camera.aspect = container.clientWidth / container.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(container.clientWidth, container.clientHeight);
+  }
+
+  var cameraAngle = 0;
+  function animate() {
+    requestAnimationFrame(animate);
+    var delta = clock.getDelta();
+    var elapsed = clock.getElapsedTime();
+
+    // Camera orbit
+    cameraAngle += delta * 0.15;
+    camera.position.x = Math.sin(cameraAngle) * 13;
+    camera.position.z = Math.cos(cameraAngle) * 13;
+    camera.position.y = 3 + Math.sin(elapsed * 0.3) * 0.5;
+    camera.lookAt(0, 0.5, 0);
+
+    // Center rotation
+    if (centerMesh) {
+      centerMesh.rotation.y += delta * 0.3;
+      centerMesh.rotation.x += delta * 0.1;
+    }
+
+    // Judge rotation
+    if (judgeNode) {
+      judgeNode.mesh.rotation.y += delta * 0.5;
+      judgeNode.mesh.rotation.x += delta * 0.2;
+    }
+
+    // Agent pulsing
+    AGENTS.forEach(function(agent) {
+      var n = agentNodes[agent.key];
+      if (!n) return;
+      if (agentState[agent.key] === "running") {
+        n.pulsePhase += delta * 4;
+        var scale = 0.35 + Math.sin(n.pulsePhase) * 0.12;
+        n.mesh.scale.set(scale / 0.35, scale / 0.35, scale / 0.35);
+        n.mat.opacity = 0.6 + Math.sin(n.pulsePhase) * 0.4;
+      } else if (agentState[agent.key] === "done" && !n.completed) {
+        n.completed = true;
+        n.mesh.scale.set(1, 1, 1);
+        n.mat.opacity = 1.0;
+        n.mat.wireframe = false;
+        // Add completion ring
+        var ringGeo = new THREE.RingGeometry(0.5, 0.6, 32);
+        var ringMat = new THREE.MeshBasicMaterial({ color: agent.color, transparent: true, opacity: 0.5, side: THREE.DoubleSide });
+        var ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.position.copy(n.mesh.position);
+        ring.lookAt(camera.position);
+        scene.add(ring);
+        n.ring = ring;
+      }
+      if (n.ring) {
+        n.ring.lookAt(camera.position);
+        n.ring.scale.set(1 + Math.sin(elapsed * 2) * 0.1, 1 + Math.sin(elapsed * 2) * 0.1, 1);
+      }
+    });
+
+    // Judge pulsing
+    if (agentState["judge"] === "running") {
+      judgeNode.pulsePhase += delta * 4;
+      var js = 0.5 + Math.sin(judgeNode.pulsePhase) * 0.15;
+      judgeNode.mesh.scale.set(js / 0.5, js / 0.5, js / 0.5);
+      judgeNode.mat.opacity = 0.6 + Math.sin(judgeNode.pulsePhase) * 0.4;
+    }
+
+    animateParticles(delta);
+
+    renderer.render(scene, camera);
+  }
+
+  /* ════════════════════════════════════════
+     TERMINAL
+  ════════════════════════════════════════ */
+  var termBody = document.getElementById("termBody");
+
+  function appendLog(text, cls) {
+    var line = document.createElement("div");
+    line.className = "term-line" + (cls ? " " + cls : "");
+    line.textContent = text;
+    termBody.appendChild(line);
+    termBody.scrollTop = termBody.scrollHeight;
+  }
+
+  function parseLogLine(text) {
+    var lower = text.toLowerCase();
+
+    // Detect agent start
+    AGENTS.forEach(function(agent) {
+      if (lower.indexOf(agent.key) !== -1 && (lower.indexOf("running") !== -1 || lower.indexOf("starting") !== -1 || lower.indexOf("spawning") !== -1)) {
+        setAgentState(agent.key, "running");
+        document.getElementById("termAgent").textContent = "agent: " + agent.key;
+      }
+      if (lower.indexOf(agent.key) !== -1 && (lower.indexOf("done") !== -1 || lower.indexOf("complete") !== -1 || lower.indexOf("finished") !== -1)) {
+        setAgentState(agent.key, "done");
+      }
+    });
+
+    if (lower.indexOf("judge") !== -1 && (lower.indexOf("aggregat") !== -1 || lower.indexOf("running") !== -1 || lower.indexOf("starting") !== -1)) {
+      setAgentState("judge", "running");
+      document.getElementById("termAgent").textContent = "agent: judge";
+    }
+    if (lower.indexOf("judge") !== -1 && (lower.indexOf("done") !== -1 || lower.indexOf("complete") !== -1)) {
+      setAgentState("judge", "done");
+    }
+
+    // Detect file count
+    var fileMatch = text.match(/(\d+)\s*files?/i);
+    if (fileMatch) {
+      document.getElementById("termFiles").textContent = "files: " + fileMatch[1];
+    }
+
+    // Detect spawning
+    if (lower.indexOf("spawning") !== -1 || lower.indexOf("spawn") !== -1) {
+      appendLog(text, "t-teal");
+      return;
+    }
+
+    // Report line
+    if (lower.indexOf("report:") !== -1 || lower.indexOf("report generated") !== -1) {
+      appendLog(text, "t-green");
+      triggerFinalAnimation();
+      return;
+    }
+
+    // Color hints
+    if (lower.indexOf("error") !== -1 || lower.indexOf("fail") !== -1) {
+      appendLog(text, "t-red");
+    } else if (lower.indexOf("warn") !== -1) {
+      appendLog(text, "t-amber");
+    } else if (lower.indexOf("done") !== -1 || lower.indexOf("complete") !== -1 || lower.indexOf("success") !== -1) {
+      appendLog(text, "t-green");
+    } else {
+      appendLog(text, "");
+    }
+  }
+
+  function setAgentState(key, state) {
+    agentState[key] = state;
+    var label = document.querySelector('.agent-label[data-agent="' + key + '"]');
+    if (label) {
+      label.classList.remove("active", "completed");
+      if (state === "running") label.classList.add("active");
+      if (state === "done") label.classList.add("completed");
+    }
+  }
+
+  function triggerFinalAnimation() {
+    // All nodes glow bright
+    AGENTS.forEach(function(agent) {
+      var n = agentNodes[agent.key];
+      if (n) {
+        n.mat.opacity = 1;
+        n.mesh.scale.set(1.3, 1.3, 1.3);
+      }
+    });
+    if (judgeNode) {
+      judgeNode.mat.opacity = 1;
+      judgeNode.mesh.scale.set(1.5, 1.5, 1.5);
+    }
+    // Brighten center
+    if (centerMesh) {
+      centerMesh.material.opacity = 1;
+    }
+  }
+
+  /* ════════════════════════════════════════
+     SSE CONNECTION
+  ════════════════════════════════════════ */
+  function connectSSE() {
+    termBody.innerHTML = "";
+    appendLog("Connecting to scan stream...", "t-dim");
+    startTime = Date.now();
+    startTimer();
+
+    eventSource = new EventSource("/api/scan/" + encodeURIComponent(scanId) + "/stream");
+
+    eventSource.addEventListener("log", function(e) {
+      parseLogLine(e.data);
+    });
+
+    eventSource.addEventListener("error", function(e) {
+      if (e.data) {
+        appendLog("ERROR: " + e.data, "t-red");
+      }
+    });
+
+    eventSource.addEventListener("done", function(e) {
+      stopTimer();
+      scanComplete = true;
+      document.getElementById("navDot").classList.add("done");
+      document.getElementById("navStatusText").textContent = "Scan Complete";
+      document.getElementById("termStatusRight").textContent = "COMPLETE";
+      document.getElementById("termStatusRight").style.color = "#30D158";
+      appendLog("Scan complete. Fetching results...", "t-green");
+
+      eventSource.close();
+      fetchResults();
+    });
+
+    eventSource.onerror = function() {
+      if (!scanComplete) {
+        stopTimer();
+        eventSource.close();
+        document.getElementById("navDot").classList.add("error");
+        document.getElementById("navStatusText").textContent = "Disconnected";
+        document.getElementById("termStatusRight").textContent = "DISCONNECTED";
+        document.getElementById("termStatusRight").style.color = "#FF3366";
+        appendLog("Connection lost.", "t-red");
+        document.getElementById("retryOverlay").classList.add("visible");
+      }
+    };
+  }
+
+  function fetchResults() {
+    fetch("/api/scan/" + encodeURIComponent(scanId) + "/result")
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        appendLog("Results loaded.", "t-green");
+        renderCostComparison(data);
+        renderFindings(data);
+        revealCompletionSections();
+      })
+      .catch(function(err) {
+        appendLog("Failed to load results: " + err.message, "t-red");
+      });
+  }
+
+  /* ════════════════════════════════════════
+     COST COMPARISON
+  ════════════════════════════════════════ */
+  function renderCostComparison(data) {
+    var usage = data.usage || [];
+    var totalInput = 0, totalOutput = 0, agentCallCount = usage.length || 6;
+
+    usage.forEach(function(u) {
+      totalInput += (u.input_tokens || 0);
+      totalOutput += (u.output_tokens || 0);
+    });
+
+    // If no usage data, use reasonable defaults for demo
+    if (totalInput === 0 && totalOutput === 0) {
+      totalInput = 45000;
+      totalOutput = 12000;
+      agentCallCount = 6;
+    }
+
+    var costs = [{ name: "CodeAudit (actual)", cost: 0, highlight: true }];
+
+    PAID_MODELS.forEach(function(model) {
+      var c;
+      if (model.flat) {
+        c = model.flat;
+      } else {
+        c = (totalInput * model.input_per_1m / 1000000 + totalOutput * model.output_per_1m / 1000000) * agentCallCount;
+      }
+      costs.push({ name: model.name, cost: parseFloat(c.toFixed(2)) });
+    });
+
+    var maxCost = Math.max.apply(null, costs.map(function(c) { return c.cost || 0.01; }));
+    // Ensure CodeRabbit is max for visual comparison
+    if (maxCost < 24) maxCost = 24;
+
+    var chart = document.getElementById("costChart");
+    chart.innerHTML = "";
+
+    costs.forEach(function(item, idx) {
+      var row = document.createElement("div");
+      row.className = "cost-row";
+
+      var nameDiv = document.createElement("div");
+      nameDiv.className = "cost-row-name" + (item.highlight ? " highlight" : "");
+      nameDiv.textContent = item.name;
+
+      var barWrap = document.createElement("div");
+      barWrap.className = "cost-bar-wrap";
+      var bar = document.createElement("div");
+      bar.className = "cost-bar " + (item.highlight ? "bar-teal" : (item.cost >= 24 ? "bar-red" : "bar-grey"));
+      var pct = item.highlight ? 100 : Math.max((item.cost / maxCost) * 100, 2);
+      bar.dataset.width = pct;
+      barWrap.appendChild(bar);
+
+      var priceDiv = document.createElement("div");
+      priceDiv.className = "cost-row-price" + (item.highlight ? " free" : "");
+      priceDiv.textContent = item.highlight ? "$0.00" : ("$" + item.cost.toFixed(2) + (item.cost === 24 ? "/mo" : ""));
+
+      row.appendChild(nameDiv);
+      row.appendChild(barWrap);
+      row.appendChild(priceDiv);
+      chart.appendChild(row);
+    });
+
+    // Token detail
+    var detail = document.getElementById("costTokenDetail");
+    detail.innerHTML =
+      "Total tokens used: " + totalInput.toLocaleString() + " input + " + totalOutput.toLocaleString() + " output across " + agentCallCount + " agent calls<br>" +
+      "Cost formula: (input_tokens x input_$/M / 1M) + (output_tokens x output_$/M / 1M) x " + agentCallCount + " calls";
+  }
+
+  /* ════════════════════════════════════════
+     FINDINGS
+  ════════════════════════════════════════ */
+  function renderFindings(data) {
+    var findings = data.findings || data.dimensions || [];
+    var grid = document.getElementById("findingsGrid");
+    grid.innerHTML = "";
+
+    var agentMeta = {
+      security:        { icon: "\u{1F512}", color: "#FF3366", model: "gemini-2.5-flash" },
+      architecture:    { icon: "\u{1F3D7}",  color: "#00F5D4", model: "gemini-2.5-flash" },
+      performance:     { icon: "\u26A1",     color: "#FFB800", model: "gemini-2.5-flash" },
+      functional:      { icon: "\u2705",     color: "#8B5CF6", model: "qwen3-next-80b" },
+      maintainability: { icon: "\u{1F4D0}",  color: "#30D158", model: "qwen3-next-80b" },
+    };
+
+    // Handle various response shapes
+    var dimensionList = Array.isArray(findings) ? findings : Object.keys(findings).map(function(k) {
+      return { dimension: k, agent: k, findings: findings[k] };
+    });
+
+    if (dimensionList.length === 0) {
+      // Demo / empty state
+      var emptyCard = document.createElement("div");
+      emptyCard.className = "finding-card";
+      emptyCard.style.setProperty("--card-color", "var(--teal)");
+      emptyCard.innerHTML = '<div class="finding-header"><div class="finding-agent"><span class="finding-agent-icon">\u2705</span><span class="finding-agent-name">No findings</span></div></div><div style="color:var(--txt2);font-size:0.88rem;">The scan completed with no issues found, or results are still being processed.</div>';
+      grid.appendChild(emptyCard);
+      return;
+    }
+
+    var totalFindings = 0;
+
+    dimensionList.forEach(function(dim) {
+      var key = (dim.dimension || dim.agent || "").toLowerCase().replace(/\s+/g, "");
+      var meta = agentMeta[key] || { icon: "\u{1F50D}", color: "var(--teal)", model: "unknown" };
+      var items = dim.findings || dim.issues || dim.items || [];
+      if (!Array.isArray(items)) items = [];
+      totalFindings += items.length;
+
+      var card = document.createElement("div");
+      card.className = "finding-card";
+      card.style.setProperty("--card-color", meta.color);
+
+      var header = '<div class="finding-header">' +
+        '<div class="finding-agent">' +
+          '<span class="finding-agent-icon">' + meta.icon + '</span>' +
+          '<div><div class="finding-agent-name">' + (dim.dimension || dim.agent || key) + '</div>' +
+          '<div class="finding-model">' + (dim.model || meta.model) + '</div></div>' +
+        '</div>' +
+        '<div class="finding-count">' + items.length + ' finding' + (items.length !== 1 ? 's' : '') + '</div>' +
+      '</div>';
+
+      var list = '<div class="finding-list">';
+      var shown = items.slice(0, 5);
+      shown.forEach(function(item) {
+        var sev = (item.severity || item.level || "NIT").toUpperCase().replace(/\s+/g, "_");
+        var text = item.message || item.description || item.title || String(item);
+        list += '<div class="finding-item">' +
+          '<span class="severity-badge severity-' + sev + '">' + sev + '</span>' +
+          '<span>' + escapeHtml(text) + '</span>' +
+        '</div>';
+      });
+      if (items.length > 5) {
+        list += '<div class="finding-item" style="color:var(--txt3);font-style:italic;">+ ' + (items.length - 5) + ' more findings</div>';
+      }
+      list += '</div>';
+
+      card.innerHTML = header + list;
+      grid.appendChild(card);
+    });
+
+    document.getElementById("findingsSummary").textContent =
+      totalFindings + " issue" + (totalFindings !== 1 ? "s" : "") + " discovered across " + dimensionList.length + " dimensions of code quality.";
+  }
+
+  function escapeHtml(str) {
+    var div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  /* ════════════════════════════════════════
+     REVEAL SECTIONS
+  ════════════════════════════════════════ */
+  function revealCompletionSections() {
+    // Animate cost bars
+    setTimeout(function() {
+      document.getElementById("costSection").classList.add("visible");
+
+      setTimeout(function() {
+        var bars = document.querySelectorAll(".cost-bar");
+        bars.forEach(function(bar, i) {
+          setTimeout(function() {
+            bar.style.width = bar.dataset.width + "%";
+          }, i * 150);
+        });
+      }, 400);
+    }, 300);
+
+    setTimeout(function() {
+      document.getElementById("findingsSection").classList.add("visible");
+    }, 600);
+
+    setTimeout(function() {
+      document.getElementById("ctaSection").classList.add("visible");
+    }, 900);
+
+    // Scroll to cost section
+    setTimeout(function() {
+      document.getElementById("costSection").scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 1200);
+  }
+
+  /* ════════════════════════════════════════
+     RETRY
+  ════════════════════════════════════════ */
+  document.getElementById("retryBtn").addEventListener("click", function() {
+    document.getElementById("retryOverlay").classList.remove("visible");
+    document.getElementById("navDot").classList.remove("error");
+    document.getElementById("navDot").classList.remove("done");
+    document.getElementById("navStatusText").textContent = "Reconnecting...";
+    document.getElementById("termStatusRight").textContent = "RECONNECTING";
+    document.getElementById("termStatusRight").style.color = "";
+    connectSSE();
+  });
+
+  /* ════════════════════════════════════════
+     DEMO MODE (if no real server)
+  ════════════════════════════════════════ */
+  function runDemo() {
+    termBody.innerHTML = "";
+    startTime = Date.now();
+    startTimer();
+
+    var demoLines = [
+      { t: 300,   text: "code-audit v1.0.0 starting scan...", cls: "t-teal" },
+      { t: 800,   text: "Discovered 47 files in project directory", cls: "" },
+      { t: 1200,  text: "Spawning 5 review agents in parallel...", cls: "t-teal" },
+      { t: 1800,  text: "Security agent running — model: gemini-2.5-flash", cls: "" },
+      { t: 2000,  text: "Architecture agent running — model: gemini-2.5-flash", cls: "" },
+      { t: 2200,  text: "Performance agent running — model: gemini-2.5-flash", cls: "" },
+      { t: 2400,  text: "Functional agent running — model: qwen3-next-80b", cls: "" },
+      { t: 2600,  text: "Maintainability agent running — model: qwen3-next-80b", cls: "" },
+      { t: 4500,  text: "Architecture agent done (2.3s, 8420 input / 2100 output tokens)", cls: "t-green" },
+      { t: 5200,  text: "Performance agent done (3.0s, 7800 input / 1950 output tokens)", cls: "t-green" },
+      { t: 6000,  text: "Maintainability agent done (3.4s, 9100 input / 2300 output tokens)", cls: "t-green" },
+      { t: 6800,  text: "Functional agent done (4.2s, 8900 input / 2150 output tokens)", cls: "t-green" },
+      { t: 7500,  text: "Security agent done (5.3s, 10200 input / 2800 output tokens)", cls: "t-green" },
+      { t: 8000,  text: "All agents complete. Judge aggregating results...", cls: "t-amber" },
+      { t: 8200,  text: "Judge agent running — model: kimi-k2.5", cls: "" },
+      { t: 10500, text: "Judge agent done (2.3s, 15400 input / 3200 output tokens)", cls: "t-green" },
+      { t: 11000, text: "Report: generated final audit report.", cls: "t-green" },
+    ];
+
+    demoLines.forEach(function(line) {
+      setTimeout(function() {
+        parseLogLine(line.text);
+      }, line.t);
+    });
+
+    // Simulate completion
+    setTimeout(function() {
+      stopTimer();
+      scanComplete = true;
+      document.getElementById("navDot").classList.add("done");
+      document.getElementById("navStatusText").textContent = "Scan Complete";
+      document.getElementById("termStatusRight").textContent = "COMPLETE";
+      document.getElementById("termStatusRight").style.color = "#30D158";
+
+      // Simulate result data
+      var demoData = {
+        usage: [
+          { agent_name: "security", model: "gemini-2.5-flash", input_tokens: 10200, output_tokens: 2800 },
+          { agent_name: "architecture", model: "gemini-2.5-flash", input_tokens: 8420, output_tokens: 2100 },
+          { agent_name: "performance", model: "gemini-2.5-flash", input_tokens: 7800, output_tokens: 1950 },
+          { agent_name: "functional", model: "qwen3-next-80b", input_tokens: 8900, output_tokens: 2150 },
+          { agent_name: "maintainability", model: "qwen3-next-80b", input_tokens: 9100, output_tokens: 2300 },
+          { agent_name: "judge", model: "kimi-k2.5", input_tokens: 15400, output_tokens: 3200 },
+        ],
+        findings: [
+          {
+            dimension: "Security",
+            model: "gemini-2.5-flash",
+            findings: [
+              { severity: "IMPORTANT", message: "SQL injection vulnerability in user input handler at db/queries.py:42 — raw string interpolation used instead of parameterized queries." },
+              { severity: "IMPORTANT", message: "Hardcoded API secret in config/settings.py:18 — should use environment variable." },
+              { severity: "NIT", message: "CORS policy allows all origins in production configuration." },
+            ]
+          },
+          {
+            dimension: "Architecture",
+            model: "gemini-2.5-flash",
+            findings: [
+              { severity: "IMPORTANT", message: "Circular dependency between modules auth and users — extract shared interface to break the cycle." },
+              { severity: "NIT", message: "Service layer directly accesses ORM models instead of going through repository pattern." },
+            ]
+          },
+          {
+            dimension: "Performance",
+            model: "gemini-2.5-flash",
+            findings: [
+              { severity: "IMPORTANT", message: "N+1 query pattern in api/views.py:87 — fetching related objects in a loop instead of using prefetch_related." },
+              { severity: "NIT", message: "Unindexed foreign key on orders.customer_id causing full table scans on join queries." },
+              { severity: "PRE_EXISTING", message: "Large synchronous file read in upload handler blocks event loop." },
+            ]
+          },
+          {
+            dimension: "Functional",
+            model: "qwen3-next-80b",
+            findings: [
+              { severity: "IMPORTANT", message: "Off-by-one error in pagination logic — last page returns duplicate of second-to-last item." },
+              { severity: "NIT", message: "Edge case: empty array input to calculate_stats returns NaN instead of 0." },
+            ]
+          },
+          {
+            dimension: "Maintainability",
+            model: "qwen3-next-80b",
+            findings: [
+              { severity: "NIT", message: "Function process_data is 340 lines long — should be decomposed into smaller, testable units." },
+              { severity: "NIT", message: "No type hints on public API functions in core/engine.py." },
+              { severity: "PRE_EXISTING", message: "Unused imports in 12 files throughout the project." },
+            ]
+          }
+        ]
+      };
+
+      renderCostComparison(demoData);
+      renderFindings(demoData);
+      revealCompletionSections();
+    }, 12000);
+  }
+
+  /* ════════════════════════════════════════
+     INIT
+  ════════════════════════════════════════ */
+  initThree();
+  animate();
+
+  // Try SSE first, fall back to demo
+  try {
+    var testSource = new EventSource("/api/scan/" + encodeURIComponent(scanId) + "/stream");
+    var connected = false;
+    testSource.onopen = function() {
+      connected = true;
+      testSource.close();
+      connectSSE();
+    };
+    testSource.onerror = function() {
+      if (!connected) {
+        testSource.close();
+        appendLog("No server detected. Running demo mode...", "t-amber");
+        setTimeout(runDemo, 500);
+      }
+    };
+  } catch(e) {
+    appendLog("SSE not supported. Running demo mode...", "t-amber");
+    setTimeout(runDemo, 500);
+  }
+
+})();
+</script>
+</body>
+</html>

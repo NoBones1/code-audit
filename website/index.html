@@ -312,6 +312,33 @@
     .cta-btn:hover { box-shadow: 0 0 40px var(--teal-glow), 0 0 80px rgba(0,245,212,0.12); transform: translateY(-2px); }
     .cta-hint { margin-top: 1rem; font-size: 0.8rem; color: var(--txt3); font-family: var(--fM); }
 
+    /* ── HERO INPUT TOGGLE ── */
+    .hero-toggle { display: flex; justify-content: center; gap: 0; margin-bottom: 1rem; }
+    .hero-toggle-btn {
+      padding: 0.5rem 1.4rem; font-family: var(--fB); font-size: 0.82rem; font-weight: 500;
+      border: 1px solid var(--bord); background: transparent; color: var(--txt2);
+      cursor: pointer; transition: all 0.25s;
+    }
+    .hero-toggle-btn:first-child { border-radius: 8px 0 0 8px; }
+    .hero-toggle-btn:last-child { border-radius: 0 8px 8px 0; }
+    .hero-toggle-btn.active { background: var(--teal-dim); border-color: rgba(0,245,212,0.3); color: var(--teal); }
+    .hero-upload-zone {
+      display: none; border: 2px dashed rgba(0,245,212,0.2); border-radius: 14px;
+      padding: 2rem; text-align: center; transition: all 0.3s; cursor: pointer;
+      background: rgba(0,245,212,0.02); max-width: 520px; margin: 0 auto;
+    }
+    .hero-upload-zone.visible { display: block; animation: fadeUp 0.3s ease; }
+    .hero-upload-zone:hover { border-color: rgba(0,245,212,0.4); background: rgba(0,245,212,0.04); }
+    .hero-upload-zone.dragover { border-color: var(--teal); background: rgba(0,245,212,0.08); }
+    .upload-icon { font-size: 2.5rem; margin-bottom: 0.8rem; }
+    .upload-text { font-size: 0.92rem; color: var(--txt2); margin-bottom: 0.4rem; }
+    .upload-hint { font-size: 0.75rem; color: var(--txt3); font-family: var(--fM); }
+    .upload-progress { display: none; margin-top: 1rem; }
+    .upload-progress.visible { display: block; }
+    .upload-bar-bg { height: 4px; background: var(--bord); border-radius: 2px; overflow: hidden; }
+    .upload-bar { height: 100%; width: 0; background: var(--teal); border-radius: 2px; transition: width 0.3s; }
+    .upload-status { font-size: 0.78rem; color: var(--txt2); margin-top: 0.5rem; font-family: var(--fM); }
+
     /* ── FOOTER ── */
     .footer {
       padding: 3rem 2rem 2rem; border-top: 1px solid var(--bord);
@@ -327,12 +354,16 @@
     @media (max-width: 900px) {
       .agents-grid { grid-template-columns: repeat(3, 1fr); }
       .feat-panel.active { grid-template-columns: 1fr; }
+      .engine-row { grid-template-columns: 1fr; }
+      .engine-divider { width: auto; height: 1px; }
     }
     @media (max-width: 640px) {
       .nav-links { display: none; }
       .steps-grid { grid-template-columns: 1fr; }
       .agents-grid { grid-template-columns: repeat(2, 1fr); }
       .compare-table { font-size: 0.8rem; }
+      .hero-upload-zone { padding: 1.5rem; }
+      .fallback-rail-wrap { padding: 1rem; gap: 6px; }
     }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
@@ -366,11 +397,27 @@
       <span class="line2">5 Agents. $0.00.</span>
     </h1>
     <p class="hero-sub">Five specialist AI agents review your code in parallel — security, architecture, performance, correctness, and maintainability. Then a judge aggregates the best findings. Completely free.</p>
-    <div class="hero-input-wrap">
-      <input class="hero-input" id="hero-input" type="text" placeholder="github.com/your-org/your-repo" spellcheck="false">
-      <button class="hero-scan-btn">Scan Now</button>
+    <div class="hero-toggle">
+      <button class="hero-toggle-btn active" data-mode="url" onclick="toggleHeroMode('url')">GitHub URL</button>
+      <button class="hero-toggle-btn" data-mode="upload" onclick="toggleHeroMode('upload')">Upload Folder</button>
     </div>
-    <div class="hero-hint">Paste any public GitHub repo URL. No sign-up required.</div>
+    <div id="hero-url-mode">
+      <div class="hero-input-wrap">
+        <input class="hero-input" id="hero-input" type="text" placeholder="github.com/your-org/your-repo" spellcheck="false">
+        <button class="hero-scan-btn">Scan Now</button>
+      </div>
+      <div class="hero-hint">Paste any public GitHub repo URL. No sign-up required.</div>
+    </div>
+    <div class="hero-upload-zone" id="hero-upload-zone" onclick="document.getElementById('folder-input').click()">
+      <div class="upload-icon">📁</div>
+      <div class="upload-text">Drop a project folder here or <span style="color:var(--teal);font-weight:600;">browse</span></div>
+      <div class="upload-hint">Up to 400 MB · All files reviewed · Deleted immediately after</div>
+      <input type="file" id="folder-input" webkitdirectory multiple hidden>
+      <div class="upload-progress" id="upload-progress">
+        <div class="upload-bar-bg"><div class="upload-bar" id="upload-bar"></div></div>
+        <div class="upload-status" id="upload-status">Uploading...</div>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -911,6 +958,113 @@ gsap.from('.cta-title, .cta-sub, .cta-btn, .cta-hint',{opacity:0,y:25,stagger:0.
 ScrollTrigger.create({start:'top -80', onUpdate:self=>{
   document.querySelector('.nav').style.background = self.direction===1 ? 'rgba(6,6,14,0.92)' : 'rgba(6,6,14,0.75)';
 }});
+
+// Hero toggle: URL vs Upload
+function toggleHeroMode(mode) {
+  document.querySelectorAll('.hero-toggle-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === mode);
+  });
+  const urlMode = document.getElementById('hero-url-mode');
+  const uploadZone = document.getElementById('hero-upload-zone');
+  if (mode === 'url') {
+    urlMode.style.display = '';
+    uploadZone.classList.remove('visible');
+  } else {
+    urlMode.style.display = 'none';
+    uploadZone.classList.add('visible');
+  }
+}
+
+// Folder upload + drag-and-drop
+(function() {
+  const zone = document.getElementById('hero-upload-zone');
+  const input = document.getElementById('folder-input');
+  const bar = document.getElementById('upload-bar');
+  const progress = document.getElementById('upload-progress');
+  const status = document.getElementById('upload-status');
+
+  // Drag-and-drop events
+  ['dragenter','dragover'].forEach(e => zone.addEventListener(e, ev => { ev.preventDefault(); zone.classList.add('dragover'); }));
+  ['dragleave','drop'].forEach(e => zone.addEventListener(e, ev => { ev.preventDefault(); zone.classList.remove('dragover'); }));
+  zone.addEventListener('drop', ev => {
+    const items = ev.dataTransfer.items;
+    if (items && items.length) collectDroppedFiles(items).then(uploadFiles);
+  });
+
+  // File input change
+  input.addEventListener('change', () => { if (input.files.length) uploadFiles(input.files); });
+
+  async function collectDroppedFiles(items) {
+    const files = [];
+    const entries = Array.from(items).map(i => i.webkitGetAsEntry()).filter(Boolean);
+    async function readDir(entry, path) {
+      if (entry.isFile) {
+        const file = await new Promise(r => entry.file(r));
+        Object.defineProperty(file, 'webkitRelativePath', { value: path + file.name });
+        files.push(file);
+      } else if (entry.isDirectory) {
+        const reader = entry.createReader();
+        const entries = await new Promise(r => reader.readEntries(r));
+        for (const e of entries) await readDir(e, path + entry.name + '/');
+      }
+    }
+    for (const e of entries) await readDir(e, '');
+    return files;
+  }
+
+  async function uploadFiles(fileList) {
+    const files = Array.from(fileList);
+    progress.classList.add('visible');
+    status.textContent = `Uploading ${files.length} files...`;
+    bar.style.width = '0%';
+
+    const formData = new FormData();
+    formData.append('mode', 'quick');
+    let totalSize = 0;
+    for (const f of files) {
+      totalSize += f.size;
+      if (totalSize > 400 * 1024 * 1024) {
+        status.textContent = 'Error: Exceeds 400 MB limit';
+        status.style.color = '#FF3366';
+        return;
+      }
+      const path = f.webkitRelativePath || f.name;
+      formData.append('files', f, path);
+    }
+
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/upload');
+      xhr.upload.onprogress = e => {
+        if (e.lengthComputable) {
+          const pct = Math.round(e.loaded / e.total * 100);
+          bar.style.width = pct + '%';
+          status.textContent = `Uploading... ${pct}%`;
+        }
+      };
+      xhr.onload = () => {
+        if (xhr.status === 200) {
+          const data = JSON.parse(xhr.responseText);
+          status.textContent = 'Upload complete. Starting scan...';
+          bar.style.width = '100%';
+          window.location.href = '/try?scan_id=' + data.scan_id;
+        } else {
+          const err = JSON.parse(xhr.responseText);
+          status.textContent = 'Error: ' + (err.detail || 'Upload failed');
+          status.style.color = '#FF3366';
+        }
+      };
+      xhr.onerror = () => {
+        status.textContent = 'Network error. Is the server running?';
+        status.style.color = '#FF3366';
+      };
+      xhr.send(formData);
+    } catch (e) {
+      status.textContent = 'Error: ' + e.message;
+      status.style.color = '#FF3366';
+    }
+  }
+})();
 </script>
 </body>
 </html>
