@@ -38,6 +38,8 @@ STALE_SCAN_AGE_SECONDS = 15 * 60  # 15 minutes
 CLEANUP_INTERVAL_SECONDS = 5 * 60  # 5 minutes
 
 WEBSITE_DIR = Path(__file__).resolve().parent
+PROJECT_DIR = WEBSITE_DIR.parent
+CODE_AUDIT_BIN = str(PROJECT_DIR / ".venv" / "bin" / "code-audit")
 
 PAID_API_PRICING = {
     "claude-sonnet-4-6": {"input_per_1m": 3.0, "output_per_1m": 15.0, "label": "Claude Sonnet 4.6"},
@@ -63,6 +65,8 @@ class ScanState:
     stderr_lines: list[str] = field(default_factory=list)
     event_queue: asyncio.Queue = field(default_factory=asyncio.Queue)
     report_data: dict | None = None  # parsed report.json
+    report_markdown: str | None = None  # raw markdown report content
+    diff_target: str = "HEAD"  # passed to code-audit --diff-target
     created_at: float = field(default_factory=time.time)
 
 
@@ -96,14 +100,45 @@ def _sanitize_path(raw: str) -> str | None:
 # Background scan runner
 # ---------------------------------------------------------------------------
 
+# Git empty-tree SHA — always exists in any git repo; diffing against it shows ALL files
+GIT_EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+
+
+async def _init_git_for_upload(path: str, queue: asyncio.Queue) -> None:
+    """Init a git repo with an empty HEAD commit so `git diff HEAD` shows all uploaded files."""
+    git_dir = os.path.join(path, ".git")
+    if os.path.isdir(git_dir):
+        return  # already a git repo (e.g. cloned)
+    try:
+        for cmd in (
+            ["git", "-C", path, "init"],
+            ["git", "-C", path, "-c", "user.email=scan@code-audit.local",
+             "-c", "user.name=CodeAudit", "commit", "--allow-empty", "-m", "base"],
+            ["git", "-C", path, "add", "-A"],  # stage files so git diff HEAD can see them
+        ):
+            p = await asyncio.create_subprocess_exec(
+                *cmd, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL,
+            )
+            await asyncio.wait_for(p.wait(), timeout=30)
+        await queue.put({"event": "log", "data": "Git context initialized — reviewing all uploaded files."})
+    except Exception as exc:
+        logger.warning("Git init failed for %s: %s", path, exc)
+
+
 async def _run_scan(state: ScanState) -> None:
     """Execute code-audit review as a subprocess and stream output to the event queue."""
     try:
         state.status = "running"
         await state.event_queue.put({"event": "log", "data": f"Starting scan in {state.mode} mode..."})
 
+        # Ensure uploaded files are visible to git diff
+        await _init_git_for_upload(state.path, state.event_queue)
+
         proc = await asyncio.create_subprocess_exec(
-            "code-audit", "review", "--path", state.path, "--mode", state.mode,
+            CODE_AUDIT_BIN, "review",
+            "--path", state.path,
+            "--mode", state.mode,
+            "--diff-target", state.diff_target,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -119,7 +154,7 @@ async def _run_scan(state: ScanState) -> None:
             await asyncio.wait_for(
                 asyncio.gather(
                     _read_stream(proc.stdout, "log", state.stdout_lines),
-                    _read_stream(proc.stderr, "error", state.stderr_lines),
+                    _read_stream(proc.stderr, "stderr", state.stderr_lines),
                     proc.wait(),
                 ),
                 timeout=SCAN_TIMEOUT_SECONDS,
@@ -130,19 +165,26 @@ async def _run_scan(state: ScanState) -> None:
             await proc.wait()
             state.status = "failed"
             state.exit_code = -1
-            await state.event_queue.put({"event": "error", "data": f"Scan timed out after {SCAN_TIMEOUT_SECONDS}s"})
+            await state.event_queue.put({"event": "stderr", "data": f"Scan timed out after {SCAN_TIMEOUT_SECONDS}s"})
             await state.event_queue.put({"event": "done", "data": "timeout"})
             return
 
         state.exit_code = proc.returncode
 
-        # Try to load the report
-        report_path = Path(state.path) / ".audit" / "report.json"
+        # Try to load the report (JSON + Markdown) before temp dir is cleaned
+        audit_dir = Path(state.path) / ".audit"
+        report_path = audit_dir / "report.json"
         if report_path.exists():
             try:
                 state.report_data = json.loads(report_path.read_text(encoding="utf-8"))
             except (json.JSONDecodeError, OSError) as exc:
                 logger.warning("Failed to read report for scan %s: %s", state.scan_id, exc)
+        md_path = audit_dir / "report.md"
+        if md_path.exists():
+            try:
+                state.report_markdown = md_path.read_text(encoding="utf-8")
+            except OSError as exc:
+                logger.warning("Failed to read markdown report for scan %s: %s", state.scan_id, exc)
 
         if proc.returncode == 0:
             state.status = "completed"
@@ -154,7 +196,7 @@ async def _run_scan(state: ScanState) -> None:
     except Exception as exc:
         logger.exception("Unexpected error running scan %s", state.scan_id)
         state.status = "failed"
-        await state.event_queue.put({"event": "error", "data": str(exc)})
+        await state.event_queue.put({"event": "stderr", "data": str(exc)})
         await state.event_queue.put({"event": "done", "data": "crash"})
 
     finally:
@@ -277,8 +319,11 @@ async def upload_files(
         logger.exception("Upload failed for scan %s", scan_id)
         raise HTTPException(status_code=500, detail=f"Upload failed: {exc}")
 
+    # Uploaded folders are not git repos — force deep mode so all files are reviewed
+    effective_mode = mode if mode in ("deep", "security") else "deep"
+
     # Create scan state
-    state = ScanState(scan_id=scan_id, path=tmpdir, mode=mode)
+    state = ScanState(scan_id=scan_id, path=tmpdir, mode=effective_mode)
     scans[scan_id] = state
 
     # Start the scan in the background
@@ -288,7 +333,7 @@ async def upload_files(
         "scan_id": scan_id,
         "file_count": saved_count,
         "total_bytes": cumulative_size,
-        "mode": mode,
+        "mode": effective_mode,
     })
 
 
@@ -297,7 +342,7 @@ async def scan_github(req: Request):
     """Clone a public GitHub repo to a temp dir and start a scan."""
     body = await req.json()
     repo_url = body.get("repo_url", "").strip()
-    mode = body.get("mode", "quick")
+    mode = body.get("mode", "deep")  # default deep — quick only reviews uncommitted diffs
 
     if not repo_url or "github.com" not in repo_url:
         raise HTTPException(status_code=400, detail="Invalid GitHub URL.")
@@ -326,10 +371,12 @@ async def scan_github(req: Request):
                 raise RuntimeError(f"Git clone failed: {err[:200]}")
 
             await state.event_queue.put({"event": "log", "data": "Clone complete. Starting review..."})
+            # For cloned repos, diff against the empty tree to show ALL files
+            state.diff_target = GIT_EMPTY_TREE
             await _run_scan(state)
         except Exception as exc:
             state.status = "failed"
-            await state.event_queue.put({"event": "error", "data": str(exc)})
+            await state.event_queue.put({"event": "stderr", "data": str(exc)})
             await state.event_queue.put({"event": "done", "data": "clone_error"})
             shutil.rmtree(state.path, ignore_errors=True)
 
@@ -394,6 +441,40 @@ async def scan_result(scan_id: str):
         "stderr_lines": state.stderr_lines,
         "report": state.report_data,
     })
+
+
+@app.get("/api/scan/{scan_id}/download/markdown")
+async def download_markdown(scan_id: str):
+    """Download the markdown audit report."""
+    from fastapi.responses import Response
+    state = scans.get(scan_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="Scan not found.")
+    if not state.report_markdown:
+        raise HTTPException(status_code=404, detail="Markdown report not available.")
+    filename = f"code-audit-{scan_id[:8]}.md"
+    return Response(
+        content=state.report_markdown,
+        media_type="text/markdown",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.get("/api/scan/{scan_id}/download/json")
+async def download_json(scan_id: str):
+    """Download the JSON audit report."""
+    from fastapi.responses import Response
+    state = scans.get(scan_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="Scan not found.")
+    if not state.report_data:
+        raise HTTPException(status_code=404, detail="JSON report not available.")
+    filename = f"code-audit-{scan_id[:8]}.json"
+    return Response(
+        content=json.dumps(state.report_data, indent=2, default=str),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @app.get("/api/pricing")

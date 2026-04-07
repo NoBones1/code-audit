@@ -62,9 +62,14 @@ class BaseReviewAgent:
         project_ctx = context.project_context or "No project context file (CLAUDE.md) found."
         prompt = prompt.replace("{{PROJECT_CONTEXT}}", project_ctx)
 
-        # Inject dependency analysis context
-        if context.dependency_context:
-            prompt += f"\n\n## Dependency Analysis\n{context.dependency_context}"
+        # Inject dependency analysis context (dimension-specific if code_graph available)
+        dep_ctx = ""
+        if context.code_graph and hasattr(context.code_graph, "format_for_agent"):
+            dep_ctx = context.code_graph.format_for_agent(self.dimension, context.changed_file_paths)
+        elif context.dependency_context:
+            dep_ctx = context.dependency_context
+        if dep_ctx:
+            prompt += f"\n\n## Dependency Analysis\n{dep_ctx}"
 
         # Inject project memory (learned team preferences)
         if self.memory_context:

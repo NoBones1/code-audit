@@ -291,9 +291,86 @@
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
     }
+
+    /* ── SPOTLIGHT CURSOR ── */
+    .spotlight {
+      position: fixed; inset: 0; pointer-events: none; z-index: 1;
+      background: radial-gradient(600px circle at var(--mx,50%) var(--my,50%),
+        rgba(0,245,212,0.04) 0%, transparent 60%);
+      transition: background 0.05s;
+    }
+
+    /* ── TILT CARDS ── */
+    .finding-card {
+      transform-style: preserve-3d; will-change: transform;
+      transition: transform 0.4s cubic-bezier(0.16,1,0.3,1), box-shadow 0.4s;
+    }
+    .finding-card:hover {
+      box-shadow: 0 24px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(var(--card-rgb,0,245,212),0.2);
+    }
+
+    /* ── DOWNLOAD BUTTON (floating) ── */
+    .dl-fab {
+      position: fixed; bottom: 2rem; right: 2rem; z-index: 50;
+      display: none; /* shown via JS once report ready */
+      align-items: center; gap: 10px;
+      padding: 0.85rem 1.5rem; border-radius: 50px;
+      background: linear-gradient(135deg, rgba(0,245,212,0.15), rgba(139,92,246,0.15));
+      border: 1px solid rgba(0,245,212,0.3); color: var(--teal);
+      font-family: var(--fD); font-size: 0.88rem; font-weight: 700; letter-spacing: 0.02em;
+      cursor: pointer; backdrop-filter: blur(12px);
+      box-shadow: 0 8px 32px rgba(0,245,212,0.12), 0 0 0 0 rgba(0,245,212,0.4);
+      transition: all 0.3s cubic-bezier(0.16,1,0.3,1); text-decoration: none;
+      overflow: hidden;
+    }
+    .dl-fab:hover {
+      background: linear-gradient(135deg, rgba(0,245,212,0.25), rgba(139,92,246,0.25));
+      box-shadow: 0 12px 48px rgba(0,245,212,0.25), 0 0 0 6px rgba(0,245,212,0.08);
+      transform: translateY(-3px);
+    }
+    .dl-fab.pulse { animation: dlPulse 2.5s ease-in-out infinite; }
+    @keyframes dlPulse {
+      0%,100% { box-shadow: 0 8px 32px rgba(0,245,212,0.12), 0 0 0 0 rgba(0,245,212,0.4); }
+      50%      { box-shadow: 0 8px 32px rgba(0,245,212,0.2),  0 0 0 12px rgba(0,245,212,0); }
+    }
+    .dl-fab-menu {
+      position: absolute; bottom: calc(100% + 12px); right: 0;
+      background: #12131e; border: 1px solid rgba(0,245,212,0.2); border-radius: 12px;
+      padding: 8px; display: none; flex-direction: column; gap: 4px; min-width: 180px;
+      box-shadow: 0 24px 48px rgba(0,0,0,0.5);
+    }
+    .dl-fab:focus .dl-fab-menu, .dl-fab-menu.open { display: flex; }
+    .dl-menu-item {
+      padding: 0.6rem 1rem; border-radius: 8px; font-family: var(--fD); font-size: 0.82rem;
+      color: var(--txt2); cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 8px;
+    }
+    .dl-menu-item:hover { background: rgba(0,245,212,0.08); color: var(--teal); }
+
+    /* ── GSAP ENTRY TARGETS ── */
+    .finding-card { opacity: 0; transform: translateY(30px); }
+    .finding-card.gsap-ready { opacity: 1; transform: none; }
+    .cost-row { opacity: 0; transform: translateX(-20px); }
+    .cost-row.gsap-ready { opacity: 1; transform: none; }
   </style>
 </head>
 <body>
+<div class="spotlight" id="spotlight"></div>
+
+<!-- floating download FAB — shown once report is ready -->
+<div class="dl-fab" id="dlFab" role="button" tabindex="0" aria-label="Download report">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+  Download Report
+  <div class="dl-fab-menu" id="dlMenu">
+    <div class="dl-menu-item" id="dlMarkdown">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      Markdown (.md)
+    </div>
+    <div class="dl-menu-item" id="dlJson">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      JSON (.json)
+    </div>
+  </div>
+</div>
 
 <div class="scroll-bar" id="scrollBar"></div>
 
@@ -325,7 +402,7 @@
     <span class="agent-label-provider badge-google">GOOGLE</span>
     <span class="agent-label-status"></span>
   </div>
-  <div class="agent-label" data-agent="architecture">
+  <div class="agent-label" data-agent="architectural">
     <span class="agent-label-icon">&#x1F3D7;</span>
     <span class="agent-label-name">Architecture</span>
     <span class="agent-label-model">gemini-2.5-flash</span>
@@ -437,7 +514,7 @@
   ════════════════════════════════════════ */
   const AGENTS = [
     { key: "security",        icon: "\u{1F512}", color: 0xFF3366, cssColor: "#FF3366" },
-    { key: "architecture",    icon: "\u{1F3D7}",  color: 0x00F5D4, cssColor: "#00F5D4" },
+    { key: "architectural",   icon: "\u{1F3D7}",  color: 0x00F5D4, cssColor: "#00F5D4" },
     { key: "performance",     icon: "\u26A1",     color: 0xFFB800, cssColor: "#FFB800" },
     { key: "functional",      icon: "\u2705",     color: 0x8B5CF6, cssColor: "#8B5CF6" },
     { key: "maintainability", icon: "\u{1F4D0}",  color: 0x30D158, cssColor: "#30D158" },
@@ -784,26 +861,30 @@
   }
 
   function parseLogLine(text) {
-    var lower = text.toLowerCase();
+    // Strip ANSI escape codes from rich terminal output
+    var clean = text.replace(/\x1b\[[0-9;]*m/g, "").replace(/\x1b\[[0-9;]*[A-Za-z]/g, "");
+    var lower = clean.toLowerCase();
 
-    // Detect agent start
-    AGENTS.forEach(function(agent) {
-      if (lower.indexOf(agent.key) !== -1 && (lower.indexOf("running") !== -1 || lower.indexOf("starting") !== -1 || lower.indexOf("spawning") !== -1)) {
-        setAgentState(agent.key, "running");
-        document.getElementById("termAgent").textContent = "agent: " + agent.key;
-      }
-      if (lower.indexOf(agent.key) !== -1 && (lower.indexOf("done") !== -1 || lower.indexOf("complete") !== -1 || lower.indexOf("finished") !== -1)) {
-        setAgentState(agent.key, "done");
+    // Detect agent start — matches "security reviewing...", "security running", "running security", "spawning security"
+    var allAgentKeys = AGENTS.map(function(a) { return a.key; }).concat(["judge"]);
+    allAgentKeys.forEach(function(key) {
+      if (lower.indexOf(key) !== -1) {
+        var isStart = lower.indexOf("review") !== -1 || lower.indexOf("running") !== -1 ||
+                      lower.indexOf("starting") !== -1 || lower.indexOf("spawning") !== -1 ||
+                      lower.indexOf("analyz") !== -1 || lower.indexOf("inspect") !== -1 ||
+                      lower.indexOf("aggregat") !== -1;
+        var isDone = lower.indexOf("finding") !== -1 || lower.indexOf("complete") !== -1 ||
+                     lower.indexOf("finished") !== -1 || lower.indexOf("done") !== -1 ||
+                     (lower.indexOf(key) !== -1 && /\d+\s+finding/.test(lower));
+        if (isStart && agentState[key] !== "done") {
+          setAgentState(key, "running");
+          document.getElementById("termAgent").textContent = "agent: " + key;
+        }
+        if (isDone) {
+          setAgentState(key, "done");
+        }
       }
     });
-
-    if (lower.indexOf("judge") !== -1 && (lower.indexOf("aggregat") !== -1 || lower.indexOf("running") !== -1 || lower.indexOf("starting") !== -1)) {
-      setAgentState("judge", "running");
-      document.getElementById("termAgent").textContent = "agent: judge";
-    }
-    if (lower.indexOf("judge") !== -1 && (lower.indexOf("done") !== -1 || lower.indexOf("complete") !== -1)) {
-      setAgentState("judge", "done");
-    }
 
     // Detect file count
     var fileMatch = text.match(/(\d+)\s*files?/i);
@@ -813,26 +894,26 @@
 
     // Detect spawning
     if (lower.indexOf("spawning") !== -1 || lower.indexOf("spawn") !== -1) {
-      appendLog(text, "t-teal");
+      appendLog(clean, "t-teal");
       return;
     }
 
     // Report line
-    if (lower.indexOf("report:") !== -1 || lower.indexOf("report generated") !== -1) {
-      appendLog(text, "t-green");
+    if (lower.indexOf("report:") !== -1 || lower.indexOf("report generated") !== -1 || lower.indexOf(".audit") !== -1) {
+      appendLog(clean, "t-green");
       triggerFinalAnimation();
       return;
     }
 
     // Color hints
     if (lower.indexOf("error") !== -1 || lower.indexOf("fail") !== -1) {
-      appendLog(text, "t-red");
+      appendLog(clean, "t-red");
     } else if (lower.indexOf("warn") !== -1) {
-      appendLog(text, "t-amber");
+      appendLog(clean, "t-amber");
     } else if (lower.indexOf("done") !== -1 || lower.indexOf("complete") !== -1 || lower.indexOf("success") !== -1) {
-      appendLog(text, "t-green");
+      appendLog(clean, "t-green");
     } else {
-      appendLog(text, "");
+      appendLog(clean, "");
     }
   }
 
@@ -876,30 +957,52 @@
 
     eventSource = new EventSource("/api/scan/" + encodeURIComponent(scanId) + "/stream");
 
+    function parseSseData(raw) {
+      try { var p = JSON.parse(raw); return typeof p.line === 'string' ? p.line : raw; } catch(ex) { return raw; }
+    }
+
     eventSource.addEventListener("log", function(e) {
-      parseLogLine(e.data);
+      parseLogLine(parseSseData(e.data));
     });
 
-    eventSource.addEventListener("error", function(e) {
+    // "stderr" = renamed from "error" to avoid colliding with the browser's built-in
+    // EventSource error event (which also fires onerror for any event named "error")
+    eventSource.addEventListener("stderr", function(e) {
       if (e.data) {
-        appendLog("ERROR: " + e.data, "t-red");
+        var msg = parseSseData(e.data);
+        appendLog(msg, "t-red");
       }
     });
 
     eventSource.addEventListener("done", function(e) {
       stopTimer();
       scanComplete = true;
-      document.getElementById("navDot").classList.add("done");
-      document.getElementById("navStatusText").textContent = "Scan Complete";
-      document.getElementById("termStatusRight").textContent = "COMPLETE";
-      document.getElementById("termStatusRight").style.color = "#30D158";
-      appendLog("Scan complete. Fetching results...", "t-green");
-
       eventSource.close();
+
+      var doneData = parseSseData(e.data);
+      var isSuccess = (doneData === "success");
+      var isFailed  = !isSuccess;
+
+      if (isSuccess) {
+        document.getElementById("navDot").classList.add("done");
+        document.getElementById("navStatusText").textContent = "Scan Complete";
+        document.getElementById("termStatusRight").textContent = "COMPLETE";
+        document.getElementById("termStatusRight").style.color = "#30D158";
+        appendLog("Scan complete. Fetching results...", "t-green");
+      } else {
+        document.getElementById("navDot").classList.add("error");
+        document.getElementById("navStatusText").textContent = "Scan Failed";
+        document.getElementById("termStatusRight").textContent = "FAILED";
+        document.getElementById("termStatusRight").style.color = "#FF3366";
+        appendLog("Scan ended with errors. Checking for partial results...", "t-amber");
+      }
+
       fetchResults();
     });
 
-    eventSource.onerror = function() {
+    eventSource.onerror = function(e) {
+      // Only treat as a genuine connection loss — don't fire when scanComplete is set
+      // (the stream closing after done is not a connection loss)
       if (!scanComplete) {
         stopTimer();
         eventSource.close();
@@ -918,9 +1021,29 @@
       .then(function(r) { return r.json(); })
       .then(function(data) {
         appendLog("Results loaded.", "t-green");
+        // Update agent labels with actual models used (from usage records)
+        var report = data.report || {};
+        var usage = report.usage || [];
+        usage.forEach(function(u) {
+          var agentName = u.agent_name || "";
+          if (!agentName) return;
+          var labelEl = document.querySelector('.agent-label[data-agent="' + agentName + '"]');
+          if (labelEl) {
+            var modelEl = labelEl.querySelector(".agent-label-model");
+            if (modelEl && u.model) modelEl.textContent = u.model;
+            var provEl = labelEl.querySelector(".agent-label-provider");
+            if (provEl && u.provider) provEl.textContent = u.provider.toUpperCase();
+          }
+          // Mark as completed in 3D scene
+          setAgentState(agentName, "done");
+        });
         renderCostComparison(data);
         renderFindings(data);
         revealCompletionSections();
+        // Only show download if report content is available
+        if (data.report && (data.report.findings || data.report.usage)) {
+          showDownloadFab();
+        }
       })
       .catch(function(err) {
         appendLog("Failed to load results: " + err.message, "t-red");
@@ -931,7 +1054,8 @@
      COST COMPARISON
   ════════════════════════════════════════ */
   function renderCostComparison(data) {
-    var usage = data.usage || [];
+    var report = data.report || {};
+    var usage = report.usage || data.usage || [];
     var totalInput = 0, totalOutput = 0, agentCallCount = usage.length || 6;
 
     usage.forEach(function(u) {
@@ -945,6 +1069,9 @@
       totalOutput = 12000;
       agentCallCount = 6;
     }
+
+    // Show actual cost from report if available
+    var actualCostUsd = (report.total_cost_usd != null) ? report.total_cost_usd : 0;
 
     var costs = [{ name: "CodeAudit (actual)", cost: 0, highlight: true }];
 
@@ -1002,41 +1129,57 @@
      FINDINGS
   ════════════════════════════════════════ */
   function renderFindings(data) {
-    var findings = data.findings || data.dimensions || [];
+    var report = data.report || {};
+    var flatFindings = report.findings || data.findings || [];
+    var summary = report.summary || {};
     var grid = document.getElementById("findingsGrid");
     grid.innerHTML = "";
 
     var agentMeta = {
       security:        { icon: "\u{1F512}", color: "#FF3366", model: "gemini-2.5-flash" },
-      architecture:    { icon: "\u{1F3D7}",  color: "#00F5D4", model: "gemini-2.5-flash" },
-      performance:     { icon: "\u26A1",     color: "#FFB800", model: "gemini-2.5-flash" },
-      functional:      { icon: "\u2705",     color: "#8B5CF6", model: "qwen3-next-80b" },
-      maintainability: { icon: "\u{1F4D0}",  color: "#30D158", model: "qwen3-next-80b" },
+      architectural:   { icon: "\u{1F3D7}", color: "#00F5D4", model: "gemini-2.5-flash" },
+      architecture:    { icon: "\u{1F3D7}", color: "#00F5D4", model: "gemini-2.5-flash" },
+      performance:     { icon: "\u26A1",    color: "#FFB800", model: "gemini-2.5-flash" },
+      functional:      { icon: "\u2705",    color: "#8B5CF6", model: "qwen3-next-80b" },
+      maintainability: { icon: "\u{1F4D0}", color: "#30D158", model: "qwen3-next-80b" },
+      dependencies:    { icon: "\u{1F4E6}", color: "#FF9F0A", model: "static scan" },
+      secrets:         { icon: "\u{1F511}", color: "#FF453A", model: "static scan" },
     };
 
-    // Handle various response shapes
-    var dimensionList = Array.isArray(findings) ? findings : Object.keys(findings).map(function(k) {
-      return { dimension: k, agent: k, findings: findings[k] };
+    // Group flat findings by dimension
+    var byDimension = {};
+    if (Array.isArray(flatFindings)) {
+      flatFindings.forEach(function(f) {
+        var dim = (f.dimension || "general").toLowerCase();
+        if (!byDimension[dim]) byDimension[dim] = [];
+        byDimension[dim].push(f);
+      });
+    }
+
+    var dimensionList = Object.keys(byDimension).map(function(k) {
+      return { dimension: k, items: byDimension[k] };
     });
 
     if (dimensionList.length === 0) {
-      // Demo / empty state
+      // Show stdout if available, else empty state
       var emptyCard = document.createElement("div");
       emptyCard.className = "finding-card";
       emptyCard.style.setProperty("--card-color", "var(--teal)");
-      emptyCard.innerHTML = '<div class="finding-header"><div class="finding-agent"><span class="finding-agent-icon">\u2705</span><span class="finding-agent-name">No findings</span></div></div><div style="color:var(--txt2);font-size:0.88rem;">The scan completed with no issues found, or results are still being processed.</div>';
+      var emptyMsg = data.status === "failed"
+        ? "Scan encountered an error. Check the terminal above for details."
+        : "The scan completed with no issues found, or results are still processing.";
+      emptyCard.innerHTML = '<div class="finding-header"><div class="finding-agent"><span class="finding-agent-icon">\u2705</span><span class="finding-agent-name">No findings</span></div></div><div style="color:var(--txt2);font-size:0.88rem;">' + escapeHtml(emptyMsg) + '</div>';
       grid.appendChild(emptyCard);
       return;
     }
 
-    var totalFindings = 0;
+    var totalFindings = flatFindings.length;
 
     dimensionList.forEach(function(dim) {
-      var key = (dim.dimension || dim.agent || "").toLowerCase().replace(/\s+/g, "");
+      var key = dim.dimension.toLowerCase().replace(/\s+/g, "");
       var meta = agentMeta[key] || { icon: "\u{1F50D}", color: "var(--teal)", model: "unknown" };
-      var items = dim.findings || dim.issues || dim.items || [];
+      var items = dim.items;
       if (!Array.isArray(items)) items = [];
-      totalFindings += items.length;
 
       var card = document.createElement("div");
       card.className = "finding-card";
@@ -1054,11 +1197,18 @@
       var list = '<div class="finding-list">';
       var shown = items.slice(0, 5);
       shown.forEach(function(item) {
-        var sev = (item.severity || item.level || "NIT").toUpperCase().replace(/\s+/g, "_");
-        var text = item.message || item.description || item.title || String(item);
+        var sev = (item.severity || item.level || "nit").toUpperCase().replace(/\s+/g, "_");
+        // Display title + abbreviated description
+        var title = item.title || item.message || item.description || String(item);
+        var desc = item.description && item.title ? item.description.slice(0, 120) + (item.description.length > 120 ? "…" : "") : "";
+        var loc = item.location ? (item.location.file ? item.location.file + (item.location.line ? ":" + item.location.line : "") : "") : "";
         list += '<div class="finding-item">' +
+          '<div style="display:flex;align-items:flex-start;gap:6px;flex-wrap:wrap;">' +
           '<span class="severity-badge severity-' + sev + '">' + sev + '</span>' +
-          '<span>' + escapeHtml(text) + '</span>' +
+          '<span style="font-weight:600;color:var(--txt);">' + escapeHtml(title) + '</span>' +
+          '</div>' +
+          (loc ? '<div style="font-size:0.72rem;color:var(--txt3);margin-top:2px;font-family:var(--fM);">' + escapeHtml(loc) + '</div>' : '') +
+          (desc ? '<div style="font-size:0.78rem;color:var(--txt2);margin-top:3px;">' + escapeHtml(desc) + '</div>' : '') +
         '</div>';
       });
       if (items.length > 5) {
@@ -1110,6 +1260,9 @@
     setTimeout(function() {
       document.getElementById("costSection").scrollIntoView({ behavior: "smooth", block: "start" });
     }, 1200);
+
+    // Init cinematic GSAP animations
+    setTimeout(initGsapAnimations, 800);
   }
 
   /* ════════════════════════════════════════
@@ -1138,11 +1291,11 @@
       { t: 800,   text: "Discovered 47 files in project directory", cls: "" },
       { t: 1200,  text: "Spawning 5 review agents in parallel...", cls: "t-teal" },
       { t: 1800,  text: "Security agent running — model: gemini-2.5-flash", cls: "" },
-      { t: 2000,  text: "Architecture agent running — model: gemini-2.5-flash", cls: "" },
+      { t: 2000,  text: "Architectural agent running — model: gemini-2.5-flash", cls: "" },
       { t: 2200,  text: "Performance agent running — model: gemini-2.5-flash", cls: "" },
       { t: 2400,  text: "Functional agent running — model: qwen3-next-80b", cls: "" },
       { t: 2600,  text: "Maintainability agent running — model: qwen3-next-80b", cls: "" },
-      { t: 4500,  text: "Architecture agent done (2.3s, 8420 input / 2100 output tokens)", cls: "t-green" },
+      { t: 4500,  text: "Architectural agent done (2.3s, 8420 input / 2100 output tokens)", cls: "t-green" },
       { t: 5200,  text: "Performance agent done (3.0s, 7800 input / 1950 output tokens)", cls: "t-green" },
       { t: 6000,  text: "Maintainability agent done (3.4s, 9100 input / 2300 output tokens)", cls: "t-green" },
       { t: 6800,  text: "Functional agent done (4.2s, 8900 input / 2150 output tokens)", cls: "t-green" },
@@ -1168,66 +1321,40 @@
       document.getElementById("termStatusRight").textContent = "COMPLETE";
       document.getElementById("termStatusRight").style.color = "#30D158";
 
-      // Simulate result data
+      // Simulate result data — matches real report.json structure
       var demoData = {
-        usage: [
-          { agent_name: "security", model: "gemini-2.5-flash", input_tokens: 10200, output_tokens: 2800 },
-          { agent_name: "architecture", model: "gemini-2.5-flash", input_tokens: 8420, output_tokens: 2100 },
-          { agent_name: "performance", model: "gemini-2.5-flash", input_tokens: 7800, output_tokens: 1950 },
-          { agent_name: "functional", model: "qwen3-next-80b", input_tokens: 8900, output_tokens: 2150 },
-          { agent_name: "maintainability", model: "qwen3-next-80b", input_tokens: 9100, output_tokens: 2300 },
-          { agent_name: "judge", model: "kimi-k2.5", input_tokens: 15400, output_tokens: 3200 },
-        ],
-        findings: [
-          {
-            dimension: "Security",
-            model: "gemini-2.5-flash",
-            findings: [
-              { severity: "IMPORTANT", message: "SQL injection vulnerability in user input handler at db/queries.py:42 — raw string interpolation used instead of parameterized queries." },
-              { severity: "IMPORTANT", message: "Hardcoded API secret in config/settings.py:18 — should use environment variable." },
-              { severity: "NIT", message: "CORS policy allows all origins in production configuration." },
-            ]
-          },
-          {
-            dimension: "Architecture",
-            model: "gemini-2.5-flash",
-            findings: [
-              { severity: "IMPORTANT", message: "Circular dependency between modules auth and users — extract shared interface to break the cycle." },
-              { severity: "NIT", message: "Service layer directly accesses ORM models instead of going through repository pattern." },
-            ]
-          },
-          {
-            dimension: "Performance",
-            model: "gemini-2.5-flash",
-            findings: [
-              { severity: "IMPORTANT", message: "N+1 query pattern in api/views.py:87 — fetching related objects in a loop instead of using prefetch_related." },
-              { severity: "NIT", message: "Unindexed foreign key on orders.customer_id causing full table scans on join queries." },
-              { severity: "PRE_EXISTING", message: "Large synchronous file read in upload handler blocks event loop." },
-            ]
-          },
-          {
-            dimension: "Functional",
-            model: "qwen3-next-80b",
-            findings: [
-              { severity: "IMPORTANT", message: "Off-by-one error in pagination logic — last page returns duplicate of second-to-last item." },
-              { severity: "NIT", message: "Edge case: empty array input to calculate_stats returns NaN instead of 0." },
-            ]
-          },
-          {
-            dimension: "Maintainability",
-            model: "qwen3-next-80b",
-            findings: [
-              { severity: "NIT", message: "Function process_data is 340 lines long — should be decomposed into smaller, testable units." },
-              { severity: "NIT", message: "No type hints on public API functions in core/engine.py." },
-              { severity: "PRE_EXISTING", message: "Unused imports in 12 files throughout the project." },
-            ]
-          }
-        ]
+        report: {
+          total_cost_usd: 0.0,
+          usage: [
+            { agent_name: "security",        model: "gemini-2.5-flash", provider: "gemini",       input_tokens: 10200, output_tokens: 2800 },
+            { agent_name: "architectural",   model: "gemini-2.5-flash", provider: "gemini",       input_tokens:  8420, output_tokens: 2100 },
+            { agent_name: "performance",     model: "gemini-2.5-flash", provider: "gemini",       input_tokens:  7800, output_tokens: 1950 },
+            { agent_name: "functional",      model: "qwen3-next-80b",   provider: "openai_compat", input_tokens:  8900, output_tokens: 2150 },
+            { agent_name: "maintainability", model: "qwen3-next-80b",   provider: "openai_compat", input_tokens:  9100, output_tokens: 2300 },
+            { agent_name: "judge",           model: "kimi-k2.5",        provider: "nvidia",        input_tokens: 15400, output_tokens: 3200 },
+          ],
+          findings: [
+            { id: "d1", dimension: "security",        severity: "important",    title: "SQL Injection in User Input Handler",        description: "Raw string interpolation used instead of parameterised queries at db/queries.py:42.",                location: { file: "db/queries.py",      line: 42 } },
+            { id: "d2", dimension: "security",        severity: "important",    title: "Hardcoded API Secret",                        description: "API secret committed to config/settings.py:18 — use an environment variable.",                   location: { file: "config/settings.py", line: 18 } },
+            { id: "d3", dimension: "security",        severity: "nit",          title: "CORS Policy Allows All Origins",              description: "Production CORS config is overly permissive.", location: { file: "config/cors.py" } },
+            { id: "d4", dimension: "architectural",   severity: "important",    title: "Circular Dependency: auth ↔ users",           description: "Circular import between auth and users modules — extract a shared interface to break the cycle.", location: { file: "auth/__init__.py" } },
+            { id: "d5", dimension: "architectural",   severity: "nit",          title: "Service Layer Bypasses Repository Pattern",   description: "Service layer directly accesses ORM models.",  location: { file: "services/user.py" } },
+            { id: "d6", dimension: "performance",     severity: "important",    title: "N+1 Query in List View",                      description: "Related objects fetched in a loop at api/views.py:87 — use prefetch_related.",                    location: { file: "api/views.py",       line: 87 } },
+            { id: "d7", dimension: "performance",     severity: "nit",          title: "Unindexed Foreign Key on orders.customer_id", description: "Causing full table scans on join queries.",     location: { file: "models/order.py" } },
+            { id: "d8", dimension: "performance",     severity: "pre_existing", title: "Synchronous File Read Blocks Event Loop",     description: "Large sync read in upload handler.",           location: { file: "api/upload.py" } },
+            { id: "d9", dimension: "functional",      severity: "important",    title: "Off-by-one in Pagination Logic",              description: "Last page returns a duplicate of the second-to-last item.",                                        location: { file: "api/pagination.py" } },
+            { id: "da", dimension: "functional",      severity: "nit",          title: "calculate_stats() Returns NaN on Empty Input", description: "Should return 0 for empty arrays.",            location: { file: "core/stats.py" } },
+            { id: "db", dimension: "maintainability", severity: "nit",          title: "process_data() is 340 Lines",                  description: "Decompose into smaller, testable units.",      location: { file: "core/engine.py" } },
+            { id: "dc", dimension: "maintainability", severity: "nit",          title: "Missing Type Hints on Public API",             description: "Public functions in core/engine.py have no type annotations.", location: { file: "core/engine.py" } },
+            { id: "dd", dimension: "maintainability", severity: "pre_existing", title: "Unused Imports in 12 Files",                   description: "Dead imports throughout the project.",         location: {} },
+          ]
+        }
       };
 
       renderCostComparison(demoData);
       renderFindings(demoData);
       revealCompletionSections();
+      showDownloadFab();
     }, 12000);
   }
 
@@ -1236,6 +1363,180 @@
   ════════════════════════════════════════ */
   initThree();
   animate();
+
+  /* ════════════════════════════════════════
+     CINEMATIC ENHANCEMENTS
+  ════════════════════════════════════════ */
+
+  // 1. Spotlight cursor
+  (function() {
+    var spotlight = document.getElementById("spotlight");
+    document.addEventListener("mousemove", function(e) {
+      spotlight.style.setProperty("--mx", e.clientX + "px");
+      spotlight.style.setProperty("--my", e.clientY + "px");
+    });
+  })();
+
+  // 2. Scroll progress bar
+  (function() {
+    var bar = document.querySelector(".scroll-bar");
+    if (!bar) return;
+    window.addEventListener("scroll", function() {
+      var pct = (window.scrollY / (document.documentElement.scrollHeight - window.innerHeight)) * 100;
+      bar.style.width = Math.min(pct, 100) + "%";
+    }, { passive: true });
+  })();
+
+  // 3. GSAP: stagger reveal finding cards + cost rows on scroll
+  function initGsapAnimations() {
+    if (typeof gsap === "undefined" || typeof ScrollTrigger === "undefined") return;
+    gsap.registerPlugin(ScrollTrigger);
+
+    // Cost rows: slide in from left with stagger
+    var costRows = document.querySelectorAll(".cost-row");
+    if (costRows.length > 0) {
+      gsap.from(costRows, {
+        x: -40, opacity: 0, duration: 0.7, ease: "power3.out",
+        stagger: 0.08,
+        scrollTrigger: { trigger: "#costSection", start: "top 75%", toggleActions: "play none none none" }
+      });
+      costRows.forEach(function(r) { r.classList.add("gsap-ready"); });
+    }
+
+    // Finding cards: rise up with stagger
+    var cards = document.querySelectorAll(".finding-card");
+    if (cards.length > 0) {
+      gsap.from(cards, {
+        y: 50, opacity: 0, scale: 0.96, duration: 0.8, ease: "power3.out",
+        stagger: 0.1,
+        scrollTrigger: { trigger: "#findingsSection", start: "top 70%", toggleActions: "play none none none" }
+      });
+      cards.forEach(function(c) { c.classList.add("gsap-ready"); });
+    }
+
+    // Section headings: character-by-character reveal
+    function splitReveal(selector) {
+      var el = document.querySelector(selector);
+      if (!el || el.dataset.split) return;
+      el.dataset.split = "1";
+      var words = el.textContent.split(" ");
+      el.innerHTML = words.map(function(w) {
+        return '<span style="display:inline-block;overflow:hidden;margin-right:0.25em"><span style="display:inline-block;will-change:transform">' + w + '</span></span>';
+      }).join("");
+      var spans = el.querySelectorAll("span > span");
+      gsap.from(spans, {
+        y: "105%", opacity: 0, duration: 0.9, ease: "power4.out", stagger: 0.06,
+        scrollTrigger: { trigger: el, start: "top 80%", toggleActions: "play none none none" }
+      });
+    }
+    splitReveal(".cost-section h2");
+    splitReveal(".findings-section h2");
+
+    // Counter-up on total finding count
+    var summaryEl = document.getElementById("findingsSummary");
+    if (summaryEl) {
+      ScrollTrigger.create({
+        trigger: summaryEl,
+        start: "top 85%",
+        once: true,
+        onEnter: function() {
+          var text = summaryEl.textContent;
+          var match = text.match(/^(\d+)/);
+          if (!match) return;
+          var target = parseInt(match[1]);
+          var obj = { val: 0 };
+          gsap.to(obj, {
+            val: target, duration: 1.2, ease: "power2.out",
+            onUpdate: function() {
+              summaryEl.textContent = text.replace(/^\d+/, Math.round(obj.val));
+            }
+          });
+        }
+      });
+    }
+
+    ScrollTrigger.refresh();
+  }
+
+  // 4. 3D tilt on finding cards
+  function initTiltCards() {
+    document.addEventListener("mousemove", function(e) {
+      var cards = document.querySelectorAll(".finding-card");
+      cards.forEach(function(card) {
+        var rect = card.getBoundingClientRect();
+        var cx = rect.left + rect.width / 2;
+        var cy = rect.top + rect.height / 2;
+        var dx = (e.clientX - cx) / (rect.width / 2);
+        var dy = (e.clientY - cy) / (rect.height / 2);
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 1.8) {
+          var rx = dy * -8;
+          var ry = dx * 8;
+          card.style.transform = "perspective(600px) rotateX(" + rx + "deg) rotateY(" + ry + "deg) scale(1.02)";
+        } else {
+          card.style.transform = "";
+        }
+      });
+    });
+    document.addEventListener("mouseleave", function() {
+      document.querySelectorAll(".finding-card").forEach(function(c) { c.style.transform = ""; });
+    });
+  }
+
+  // 5. Download report
+  function initDownload() {
+    var fab = document.getElementById("dlFab");
+    var menu = document.getElementById("dlMenu");
+    var dlMd = document.getElementById("dlMarkdown");
+    var dlJs = document.getElementById("dlJson");
+    if (!fab) return;
+
+    // Toggle menu
+    fab.addEventListener("click", function(e) {
+      e.stopPropagation();
+      menu.classList.toggle("open");
+    });
+    document.addEventListener("click", function() { menu.classList.remove("open"); });
+
+    function triggerDownload(url, filename) {
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+    }
+
+    if (dlMd) dlMd.addEventListener("click", function(e) {
+      e.stopPropagation();
+      menu.classList.remove("open");
+      if (scanId === "demo") {
+        // Generate a simple markdown for demo
+        var blob = new Blob(["# CodeAudit Demo Report\n\nThis is a demo scan. Run a real scan to download the full report.\n"], { type: "text/markdown" });
+        triggerDownload(URL.createObjectURL(blob), "code-audit-demo.md");
+      } else {
+        triggerDownload("/api/scan/" + encodeURIComponent(scanId) + "/download/markdown", "code-audit-" + scanId.slice(0,8) + ".md");
+      }
+    });
+
+    if (dlJs) dlJs.addEventListener("click", function(e) {
+      e.stopPropagation();
+      menu.classList.remove("open");
+      if (scanId === "demo") {
+        var blob = new Blob([JSON.stringify({note: "Demo scan — no real data"}, null, 2)], { type: "application/json" });
+        triggerDownload(URL.createObjectURL(blob), "code-audit-demo.json");
+      } else {
+        triggerDownload("/api/scan/" + encodeURIComponent(scanId) + "/download/json", "code-audit-" + scanId.slice(0,8) + ".json");
+      }
+    });
+  }
+
+  // Expose fab show so revealCompletionSections can activate it
+  function showDownloadFab() {
+    var fab = document.getElementById("dlFab");
+    if (fab) { fab.style.display = "flex"; fab.classList.add("pulse"); }
+  }
+
+  initTiltCards();
+  initDownload();
 
   // Try SSE first, fall back to demo
   try {

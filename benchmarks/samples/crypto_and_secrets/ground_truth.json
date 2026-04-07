@@ -1,0 +1,43 @@
+{
+  "project_name": "crypto_and_secrets",
+  "description": "Python utils with MD5 password hashing, eval injection, unbounded memory, god function",
+  "expected_findings": [
+    {
+      "file_path": "utils.py",
+      "start_line": 5,
+      "dimension": "security",
+      "cwe": "CWE-328",
+      "title_pattern": "md5",
+      "severity": "important"
+    },
+    {
+      "file_path": "utils.py",
+      "start_line": 8,
+      "dimension": "security",
+      "cwe": "CWE-94",
+      "title_pattern": "eval",
+      "severity": "important"
+    },
+    {
+      "file_path": "utils.py",
+      "start_line": 15,
+      "dimension": "performance",
+      "title_pattern": "memory",
+      "severity": "nit"
+    },
+    {
+      "file_path": "utils.py",
+      "start_line": 20,
+      "dimension": "architectural",
+      "title_pattern": "responsib",
+      "severity": "nit"
+    },
+    {
+      "file_path": "utils.py",
+      "start_line": 20,
+      "dimension": "maintainability",
+      "title_pattern": "complex",
+      "severity": "nit"
+    }
+  ]
+}

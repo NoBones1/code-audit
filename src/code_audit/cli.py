@@ -190,6 +190,136 @@ async def _run_audit(config, project_path: Path) -> None:
         str(sarif_path) if sarif_path else None,
     )
 
+    # Offer auto-fix for findings with suggestions
+    fixable = [f for f in report.findings if f.is_fixable]
+    if fixable:
+        await _offer_fixes(fixable, project_path, config)
+
+
+async def _offer_fixes(fixable: list, project_path, config) -> None:
+    """Interactive fix application — offered after audit completes."""
+    from rich.prompt import Prompt
+    from rich.syntax import Syntax
+
+    from code_audit.engine.fixer import fix_finding
+    from code_audit.llm.fallback import FallbackProvider
+
+    console.print()
+    console.print(
+        f"[bold]{len(fixable)}[/bold] finding{'s' if len(fixable) != 1 else ''} "
+        f"ha{'ve' if len(fixable) != 1 else 's'} suggested fixes.",
+    )
+
+    choice = Prompt.ask(
+        "Apply fixes?",
+        choices=["y", "n", "select"],
+        default="n",
+    )
+
+    if choice == "n":
+        return
+
+    # Determine which findings to fix
+    if choice == "select":
+        console.print()
+        for i, f in enumerate(fixable, 1):
+            console.print(
+                f"  [bold]{i}[/bold]. {f.severity.emoji} {f.title} "
+                f"[dim]({f.location.display})[/dim]"
+            )
+        console.print()
+        selection = Prompt.ask(
+            "Enter numbers to apply (comma-separated, e.g. 1,3,5)",
+            default="",
+        )
+        if not selection.strip():
+            return
+        try:
+            indices = [int(x.strip()) - 1 for x in selection.split(",") if x.strip()]
+            selected = [fixable[i] for i in indices if 0 <= i < len(fixable)]
+        except (ValueError, IndexError):
+            console.print("[red]Invalid selection.[/red]")
+            return
+        if not selected:
+            return
+    else:
+        selected = fixable
+
+    # Create LLM provider for fix generation
+    llm = FallbackProvider(config.llm)
+
+    applied = 0
+    skipped = 0
+    modified_files: set[str] = set()
+
+    for finding in selected:
+        console.print()
+        console.print(
+            f"[bold]{finding.severity.emoji} {finding.title}[/bold] "
+            f"[dim]({finding.location.display})[/dim]"
+        )
+
+        new_content, diff_str, explanation = await fix_finding(
+            finding=finding,
+            project_path=project_path,
+            llm=llm,
+        )
+
+        if new_content is None:
+            console.print(f"  [yellow]Skipped: {explanation}[/yellow]")
+            skipped += 1
+            continue
+
+        # Show diff preview
+        console.print(f"  [dim]{explanation}[/dim]")
+        console.print()
+        if diff_str:
+            console.print(Syntax(diff_str, "diff", theme="monokai", line_numbers=False))
+
+        confirm = Prompt.ask("  Apply this fix?", choices=["y", "n"], default="n")
+        if confirm == "y":
+            file_path = project_path / finding.location.file_path
+            file_path.write_text(new_content, encoding="utf-8")
+            console.print("  [green]Applied.[/green]")
+            applied += 1
+            modified_files.add(finding.location.file_path)
+        else:
+            console.print("  [dim]Skipped.[/dim]")
+            skipped += 1
+
+    # Summary
+    console.print()
+    if applied > 0:
+        console.print(
+            f"[bold green]Applied {applied} fix{'es' if applied != 1 else ''}[/bold green] "
+            f"across {len(modified_files)} file{'s' if len(modified_files) != 1 else ''}. "
+            f"{skipped} skipped."
+        )
+        console.print("[dim]Changes are uncommitted — review and commit when ready.[/dim]")
+    else:
+        console.print(f"[dim]No fixes applied. {skipped} skipped.[/dim]")
+
+
+@app.command()
+def benchmark(
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show per-finding match details"),
+    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output path for results JSON"),
+) -> None:
+    """Run accuracy benchmarks against known-vulnerable code samples.
+
+    Measures precision, recall, and F1 score by comparing audit findings
+    against planted vulnerabilities with known ground truth.
+    """
+    import asyncio
+
+    from benchmarks.run import main as bench_main
+
+    console.print("[bold]CodeAudit Benchmark Suite[/bold]")
+    console.print("[dim]Running deep-mode audit on sample projects with real LLM calls...[/dim]")
+    console.print()
+
+    asyncio.run(bench_main(verbose=verbose, output=str(output) if output else None))
+
 
 @app.command()
 def version() -> None:
@@ -594,6 +724,11 @@ def serve(
         console.print("[red]Error: GITHUB_TOKEN environment variable is required[/red]")
         raise typer.Exit(1)
 
+    if not os.environ.get("CODE_AUDIT_WEBHOOK_SECRET"):
+        console.print("[yellow]Warning: CODE_AUDIT_WEBHOOK_SECRET not set — webhook signature verification disabled.[/yellow]")
+        console.print("[yellow]Set this env var for production use to prevent unauthorized requests.[/yellow]")
+        console.print()
+
     console.print(f"[bold]CodeAudit Webhook Server[/bold]")
     console.print(f"Listening on http://{host}:{port}/webhook")
     console.print(f"Health check: http://{host}:{port}/health")
@@ -611,16 +746,28 @@ def review_pr(
         ReviewModeChoice.deep, "--mode", "-m",
         help="Review mode",
     ),
+    platform: str = typer.Option(
+        "github", "--platform",
+        help="Git platform: github, gitlab, bitbucket",
+    ),
 ) -> None:
-    """Review a specific GitHub pull request and post findings as comments.
+    """Review a pull request / merge request and post findings as comments.
 
-    Requires GITHUB_TOKEN env var with repo permissions.
+    Supports GitHub, GitLab, and Bitbucket.
+    Requires the appropriate token env var (GITHUB_TOKEN, GITLAB_TOKEN, or BITBUCKET_TOKEN).
 
-    Example: code-audit review-pr owner/repo 123
+    Example: code-audit review-pr owner/repo 123 --platform github
     """
-    github_token = os.environ.get("GITHUB_TOKEN", "")
-    if not github_token:
-        console.print("[red]Error: GITHUB_TOKEN environment variable is required[/red]")
+    from code_audit.platforms.base import TOKEN_ENV_VARS
+
+    token_env = TOKEN_ENV_VARS.get(platform, "GITHUB_TOKEN")
+    token = os.environ.get(token_env, "")
+    if not token:
+        console.print(f"[red]Error: {token_env} environment variable is required[/red]")
+        raise typer.Exit(1)
+
+    if platform not in ("github", "gitlab", "bitbucket"):
+        console.print(f"[red]Error: unsupported platform '{platform}'. Use: github, gitlab, bitbucket[/red]")
         raise typer.Exit(1)
 
     parts = repo.split("/")
@@ -637,23 +784,33 @@ def review_pr(
 
     from code_audit.config.models import ReviewMode
     from code_audit.github.webhook import handle_pr_event
-    from code_audit.github.client import GitHubClient
+    from code_audit.platforms import PlatformFactory
+
+    clone_urls = {
+        "github": f"https://github.com/{owner}/{repo_name}.git",
+        "gitlab": f"https://gitlab.com/{owner}/{repo_name}.git",
+        "bitbucket": f"https://bitbucket.org/{owner}/{repo_name}.git",
+    }
 
     async def _run():
-        client = GitHubClient(token=github_token)
+        platform_client = PlatformFactory.create(platform, token=token)
         try:
-            pr_data = await client.get_pr(owner, repo_name, pr)
-            repo_data = {"owner": {"login": owner}, "name": repo_name, "clone_url": f"https://github.com/{owner}/{repo_name}.git"}
+            pr_data = await platform_client.get_pr(owner, repo_name, pr)
+            repo_data = {
+                "owner": {"login": owner},
+                "name": repo_name,
+                "clone_url": clone_urls.get(platform, clone_urls["github"]),
+            }
             result = await handle_pr_event(
                 action="cli_triggered",
                 pr_data=pr_data,
                 repo_data=repo_data,
-                github_token=github_token,
+                github_token=token,
                 review_mode=mode_map[mode],
             )
             console.print(f"[green]Review complete![/green] {result['findings']} findings posted to PR #{pr}")
         finally:
-            await client.close()
+            await platform_client.close()
 
     asyncio.run(_run())
 

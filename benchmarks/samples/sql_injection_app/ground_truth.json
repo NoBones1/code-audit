@@ -1,0 +1,43 @@
+{
+  "project_name": "sql_injection_app",
+  "description": "Python app with SQL injection, hardcoded secrets, N+1 queries, missing timeout, bare except",
+  "expected_findings": [
+    {
+      "file_path": "app.py",
+      "start_line": 4,
+      "dimension": "security",
+      "cwe": "CWE-798",
+      "title_pattern": "hardcoded",
+      "severity": "important"
+    },
+    {
+      "file_path": "app.py",
+      "start_line": 9,
+      "dimension": "security",
+      "cwe": "CWE-89",
+      "title_pattern": "sql injection",
+      "severity": "important"
+    },
+    {
+      "file_path": "app.py",
+      "start_line": 17,
+      "dimension": "performance",
+      "title_pattern": "n+1",
+      "severity": "important"
+    },
+    {
+      "file_path": "app.py",
+      "start_line": 25,
+      "dimension": "functional",
+      "title_pattern": "timeout",
+      "severity": "nit"
+    },
+    {
+      "file_path": "app.py",
+      "start_line": 30,
+      "dimension": "maintainability",
+      "title_pattern": "bare except",
+      "severity": "nit"
+    }
+  ]
+}

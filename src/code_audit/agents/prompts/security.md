@@ -59,5 +59,31 @@ Respond with a JSON object matching the AgentFindingsResponse schema. Include:
 2. Include the exact file path and line numbers for every finding
 3. Provide a concrete remediation suggestion for each finding
 4. Assign confidence scores honestly — 0.9+ only for clear, exploitable vulnerabilities
-5. Tag findings with relevant identifiers (e.g., "owasp-a01", "cwe-79", "cwe-89")
+5. **MANDATORY**: Tag every finding with at least one `cwe-NNN` tag from this reference table:
+
+| Tag | Vulnerability | OWASP 2021 |
+|-----|--------------|------------|
+| cwe-22 | Path Traversal | A01 Broken Access Control |
+| cwe-77 | Command Injection | A03 Injection |
+| cwe-78 | OS Command Injection | A03 Injection |
+| cwe-79 | Cross-Site Scripting (XSS) | A03 Injection |
+| cwe-89 | SQL Injection | A03 Injection |
+| cwe-94 | Code Injection | A03 Injection |
+| cwe-209 | Error Message Info Leak | A04 Insecure Design |
+| cwe-259 | Hard-coded Password | A02 Cryptographic Failures |
+| cwe-284 | Improper Access Control | A01 Broken Access Control |
+| cwe-287 | Improper Authentication | A07 Auth Failures |
+| cwe-306 | Missing Authentication | A07 Auth Failures |
+| cwe-327 | Broken Crypto Algorithm | A02 Cryptographic Failures |
+| cwe-330 | Insufficient Randomness | A02 Cryptographic Failures |
+| cwe-345 | Insufficient Data Verification | A08 Integrity Failures |
+| cwe-352 | CSRF | A01 Broken Access Control |
+| cwe-502 | Insecure Deserialization | A04 Insecure Design |
+| cwe-611 | XXE Processing | A02 Cryptographic Failures |
+| cwe-614 | Cookie Without Secure Flag | A05 Misconfiguration |
+| cwe-798 | Hard-coded Credentials | A07 Auth Failures |
+| cwe-918 | SSRF | A10 SSRF |
+| cwe-942 | Overly Permissive CORS | A05 Misconfiguration |
+
+If a finding doesn't match any CWE above, use the closest match or omit the tag
 6. If a finding contradicts a Skip rule, do NOT report it

@@ -100,3 +100,22 @@ class Finding(BaseModel):
     @property
     def severity_display(self) -> str:
         return f"{self.severity.emoji} {self.severity.label}"
+
+    @property
+    def is_fixable(self) -> bool:
+        """A finding is fixable if it has both a suggestion and a code snippet to locate."""
+        return bool(self.suggestion and self.location.snippet)
+
+    @property
+    def cwe_ids(self) -> list[str]:
+        """Extract CWE identifiers from this finding's tags."""
+        from code_audit.models.compliance import extract_cwe_ids
+
+        return extract_cwe_ids(self.tags)
+
+    @property
+    def owasp_categories(self) -> list[str]:
+        """Map this finding's CWE tags to OWASP 2021 Top 10 categories."""
+        from code_audit.models.compliance import map_cwes_to_owasp
+
+        return map_cwes_to_owasp(self.cwe_ids)

@@ -269,6 +269,7 @@ class Orchestrator:
 
         # Build code graph for dependency analysis
         dependency_context = ""
+        resolved_graph = None
         try:
             graph_analyzer = CodeGraphAnalyzer(self.project_path)
             code_graph = graph_analyzer.analyze(
@@ -278,6 +279,7 @@ class Orchestrator:
             )
             if code_graph.total_symbols > 0:
                 dependency_context = code_graph.format_for_prompt(changed_paths)
+                resolved_graph = code_graph
         except Exception:
             pass  # Code graph is a nice-to-have, not a blocker
 
@@ -294,6 +296,7 @@ class Orchestrator:
             review_rules=review_rules,
             project_context=project_context,
             dependency_context=dependency_context,
+            code_graph=resolved_graph,
             diff_target=self.config.review.diff_target,
             total_additions=total_add,
             total_deletions=total_del,

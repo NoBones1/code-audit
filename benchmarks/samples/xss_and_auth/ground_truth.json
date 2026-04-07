@@ -1,0 +1,43 @@
+{
+  "project_name": "xss_and_auth",
+  "description": "Node.js server with XSS, missing auth, sync file read, deep nesting, missing error handling",
+  "expected_findings": [
+    {
+      "file_path": "server.js",
+      "start_line": 9,
+      "dimension": "security",
+      "cwe": "CWE-306",
+      "title_pattern": "auth",
+      "severity": "important"
+    },
+    {
+      "file_path": "server.js",
+      "start_line": 12,
+      "dimension": "security",
+      "cwe": "CWE-79",
+      "title_pattern": "xss",
+      "severity": "important"
+    },
+    {
+      "file_path": "server.js",
+      "start_line": 17,
+      "dimension": "performance",
+      "title_pattern": "sync",
+      "severity": "important"
+    },
+    {
+      "file_path": "server.js",
+      "start_line": 24,
+      "dimension": "maintainability",
+      "title_pattern": "nest",
+      "severity": "nit"
+    },
+    {
+      "file_path": "server.js",
+      "start_line": 30,
+      "dimension": "functional",
+      "title_pattern": "error",
+      "severity": "nit"
+    }
+  ]
+}

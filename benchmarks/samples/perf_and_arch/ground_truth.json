@@ -1,0 +1,42 @@
+{
+  "project_name": "perf_and_arch",
+  "description": "Python API with command injection, O(n^2) search, silent error swallowing, magic numbers, circular import",
+  "expected_findings": [
+    {
+      "file_path": "api.py",
+      "start_line": 5,
+      "dimension": "security",
+      "cwe": "CWE-78",
+      "title_pattern": "command injection",
+      "severity": "important"
+    },
+    {
+      "file_path": "api.py",
+      "start_line": 9,
+      "dimension": "performance",
+      "title_pattern": "n^2",
+      "severity": "important"
+    },
+    {
+      "file_path": "api.py",
+      "start_line": 16,
+      "dimension": "functional",
+      "title_pattern": "error",
+      "severity": "nit"
+    },
+    {
+      "file_path": "api.py",
+      "start_line": 20,
+      "dimension": "maintainability",
+      "title_pattern": "magic",
+      "severity": "nit"
+    },
+    {
+      "file_path": "api.py",
+      "start_line": 26,
+      "dimension": "architectural",
+      "title_pattern": "circular",
+      "severity": "important"
+    }
+  ]
+}

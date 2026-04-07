@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from code_audit.models.compliance import CWE_OWASP_MAP
 from code_audit.models.finding import Finding, Severity
 from code_audit.models.report import AuditReport
 
@@ -89,7 +90,36 @@ def _build_sarif_dict(report: AuditReport) -> dict:
                 },
             ]
 
+        # Add CWE/OWASP taxa references
+        if finding.cwe_ids:
+            result["taxa"] = [
+                {"id": cwe_id, "toolComponent": {"name": "CWE"}}
+                for cwe_id in finding.cwe_ids
+            ]
+
         results.append(result)
+
+    # Build CWE taxonomy entries from all findings
+    all_cwe_ids: set[str] = set()
+    for finding in report.findings:
+        all_cwe_ids.update(finding.cwe_ids)
+
+    taxonomies = []
+    if all_cwe_ids:
+        cwe_taxa = []
+        for cwe_id in sorted(all_cwe_ids):
+            entry = CWE_OWASP_MAP.get(cwe_id, {})
+            cwe_taxa.append({
+                "id": cwe_id,
+                "name": entry.get("name", cwe_id),
+                **({"shortDescription": {"text": f"OWASP {entry['owasp']} {entry['owasp_name']}"}} if entry else {}),
+            })
+        taxonomies.append({
+            "name": "CWE",
+            "version": "4.14",
+            "informationUri": "https://cwe.mitre.org/",
+            "taxa": cwe_taxa,
+        })
 
     sarif = {
         "$schema": SARIF_SCHEMA_URI,
@@ -99,11 +129,12 @@ def _build_sarif_dict(report: AuditReport) -> dict:
                 "tool": {
                     "driver": {
                         "name": "CodeAudit",
-                        "version": "0.1.0",
+                        "version": "0.2.0",
                         "informationUri": "https://github.com/code-audit/code-audit",
                         "rules": rules,
                     },
                 },
+                **({"taxonomies": taxonomies} if taxonomies else {}),
                 "results": results,
                 "invocations": [
                     {

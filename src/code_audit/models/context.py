@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -100,6 +102,11 @@ class ReviewContext(BaseModel):
     dependency_context: str = Field(
         default="",
         description="Code graph / dependency analysis context for agents",
+    )
+    code_graph: Any = Field(
+        default=None,
+        description="CodeGraph object for dimension-specific formatting",
+        exclude=True,  # Don't serialize this large object
     )
     diff_target: str = Field(
         default="HEAD",
